@@ -1,198 +1,283 @@
-// Background script for managing timer state and notifications
+// background.js
+
+const DEFAULT_WORK_DURATION = 25 * 60;
+const DEFAULT_SHORT_BREAK_DURATION = 5 * 60;
+const DEFAULT_LONG_BREAK_DURATION = 15 * 60;
+const POMODOROS_UNTIL_LONG_BREAK = 4;
+const MAIN_TIMER_ALARM_NAME = 'pomodoroMainTimer';
 
 let timerState = {
-  currentTime: 25 * 60, // Default work duration in seconds
-  workDuration: 25 * 60,
-  breakDuration: 5 * 60,
+  userSetWorkDuration: DEFAULT_WORK_DURATION,
+  shortBreakDuration: DEFAULT_SHORT_BREAK_DURATION,
+  longBreakDuration: DEFAULT_LONG_BREAK_DURATION,
+  
+  currentTime: DEFAULT_WORK_DURATION,
   isPaused: true,
-  isWorkSession: true, // true for work, false for break
-  timerId: null // To store the alarm name
+  currentSessionType: 'WORK', // 'WORK', 'SHORT_BREAK', 'LONG_BREAK'
+  pomodorosCompletedThisCycle: 0,
+
+  isAdHocBreakActive: false,
+  adHocBreakStartTime: 0,
+  currentAdHocBreakTime: 0, // Duration in seconds, updated dynamically
+
+  // For session summary
+  adHocBreakCountThisSession: 0,
+  totalAdHocBreakDurationThisSession: 0,
+  showSessionSummary: false,
+  sessionSummaryText: ""
 };
 
-// Function to update timer state (e.g., when popup sends new settings)
-function updateTimerSettings(newWorkDuration, newBreakDuration) {
-  timerState.workDuration = newWorkDuration;
-  timerState.breakDuration = newBreakDuration;
-  if (timerState.isPaused) { // Only update current time if paused and reset
-    timerState.currentTime = timerState.isWorkSession ? newWorkDuration : newBreakDuration;
-  }
+// --- Helper Functions ---
+function showNotification(message) {
+  chrome.notifications.create({
+    type: 'basic', iconUrl: 'icons/icon128.png',
+    title: 'NeuroFocus Timer', message: message, priority: 2
+  });
 }
 
-function startTimerAlarm() {
-  if (timerState.isPaused) {
+function broadcastState() {
+  if (timerState.isAdHocBreakActive && timerState.adHocBreakStartTime > 0) {
+    timerState.currentAdHocBreakTime = Math.floor((Date.now() - timerState.adHocBreakStartTime) / 1000);
+  }
+  chrome.runtime.sendMessage({ type: 'TIMER_STATE_UPDATE', state: { ...timerState } });
+  console.log("State broadcasted:", JSON.parse(JSON.stringify(timerState))); // Deep copy for logging
+}
+
+function saveDurationsAndCycleToStorage() {
+  chrome.storage.local.set({
+    userSetWorkDuration: timerState.userSetWorkDuration,
+    shortBreakDuration: timerState.shortBreakDuration,
+    longBreakDuration: timerState.longBreakDuration,
+    pomodorosCompletedThisCycle: timerState.pomodorosCompletedThisCycle
+  }, () => console.log("Durations & cycle count saved."));
+}
+
+function loadStateFromStorage(callback) {
+  chrome.storage.local.get([
+    'userSetWorkDuration', 'shortBreakDuration', 'longBreakDuration', 'pomodorosCompletedThisCycle'
+  ], (result) => {
+    timerState.userSetWorkDuration = result.userSetWorkDuration !== undefined ? result.userSetWorkDuration : DEFAULT_WORK_DURATION;
+    timerState.shortBreakDuration = result.shortBreakDuration !== undefined ? result.shortBreakDuration : DEFAULT_SHORT_BREAK_DURATION;
+    timerState.longBreakDuration = result.longBreakDuration !== undefined ? result.longBreakDuration : DEFAULT_LONG_BREAK_DURATION;
+    timerState.pomodorosCompletedThisCycle = result.pomodorosCompletedThisCycle !== undefined ? result.pomodorosCompletedThisCycle : 0;
+    
+    // Reset active state variables
+    timerState.currentTime = timerState.userSetWorkDuration;
+    timerState.isPaused = true;
+    timerState.currentSessionType = 'WORK';
+    timerState.isAdHocBreakActive = false;
+    timerState.currentAdHocBreakTime = 0;
+    timerState.adHocBreakStartTime = 0;
+    timerState.adHocBreakCountThisSession = 0;
+    timerState.totalAdHocBreakDurationThisSession = 0;
+    timerState.showSessionSummary = false;
+    timerState.sessionSummaryText = "";
+
+    console.log("State loaded/reinitialized from storage:", timerState);
+    if (callback) callback();
+  });
+}
+
+// --- Timer Control Functions ---
+function startMainTimer() {
+  if (timerState.isPaused && !timerState.isAdHocBreakActive) {
     timerState.isPaused = false;
-    // Create an alarm that fires every second
-    // Note: Frequent alarms like every second are resource-intensive.
-    // For a production extension, consider alternatives or less frequent updates if possible.
-    // However, for a countdown timer, this is a common approach.
-    // Chrome alarms are not guaranteed to fire exactly on time.
-    chrome.alarms.create('pomodoroTimer', { delayInMinutes: 0, periodInMinutes: 1 / 60 });
-    console.log("Timer alarm started.");
+    timerState.showSessionSummary = false; // Clear summary when timer starts/resumes
+    chrome.alarms.create(MAIN_TIMER_ALARM_NAME, { delayInMinutes: 0, periodInMinutes: 1 / 60 });
+    console.log(`${timerState.currentSessionType} timer alarm started/resumed.`);
+    broadcastState();
   }
 }
 
-function pauseTimerAlarm() {
-  timerState.isPaused = true;
-  chrome.alarms.clear('pomodoroTimer');
-  console.log("Timer alarm paused.");
+function pauseMainTimer() { // Explicit pause, not ad-hoc break start
+  if (!timerState.isPaused && !timerState.isAdHocBreakActive) {
+    timerState.isPaused = true;
+    chrome.alarms.clear(MAIN_TIMER_ALARM_NAME);
+    console.log(`${timerState.currentSessionType} timer alarm explicitly paused.`);
+    broadcastState();
+  }
 }
 
-function resetTimerAlarm() {
+function resetPomodoroCycle() {
+  chrome.alarms.clear(MAIN_TIMER_ALARM_NAME);
   timerState.isPaused = true;
-  timerState.isWorkSession = true;
-  timerState.currentTime = timerState.workDuration;
-  chrome.alarms.clear('pomodoroTimer');
-  console.log("Timer alarm reset.");
+  timerState.currentSessionType = 'WORK';
+  timerState.currentTime = timerState.userSetWorkDuration;
+  timerState.pomodorosCompletedThisCycle = 0;
+  timerState.isAdHocBreakActive = false;
+  timerState.currentAdHocBreakTime = 0;
+  timerState.adHocBreakStartTime = 0;
+  timerState.adHocBreakCountThisSession = 0;
+  timerState.totalAdHocBreakDurationThisSession = 0;
+  timerState.showSessionSummary = false;
+  console.log("Pomodoro cycle reset.");
+  saveDurationsAndCycleToStorage();
   broadcastState();
 }
 
-function showNotification(message) {
-  chrome.notifications.create({
-    type: 'basic',
-    iconUrl: 'icons/icon128.png', // Ensure you have this icon
-    title: 'NeuroFocus Timer',
-    message: message,
-    priority: 2
-  });
+function generateSessionSummary() {
+    if (timerState.adHocBreakCountThisSession === 0) {
+        timerState.sessionSummaryText = "Focus session completed uninterrupted! Great job!";
+    } else {
+        const totalBreakSeconds = timerState.totalAdHocBreakDurationThisSession;
+        const breakMinutes = Math.floor(totalBreakSeconds / 60);
+        const breakSeconds = totalBreakSeconds % 60;
+        timerState.sessionSummaryText = `Focus session complete! You took ${timerState.adHocBreakCountThisSession} break(s) totaling ${breakMinutes}m ${breakSeconds}s.`;
+    }
+    timerState.showSessionSummary = true;
 }
 
-// Listen for alarm events
-chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === 'pomodoroTimer' && !timerState.isPaused) {
-    if (timerState.currentTime > 0) {
-      timerState.currentTime--;
-    } else {
-      // Timer reached zero
-      timerState.isPaused = true; // Pause before switching
-      chrome.alarms.clear('pomodoroTimer'); // Stop the alarm
-
-      timerState.isWorkSession = !timerState.isWorkSession;
-      const previousSessionWasWork = !timerState.isWorkSession; // if it's now break, previous was work
-
-      timerState.currentTime = timerState.isWorkSession ? timerState.workDuration : timerState.breakDuration;
-
-      if (previousSessionWasWork) {
-        showNotification("Work session ended! Time for a break.");
-      } else {
-        showNotification("Break's over! Time to focus.");
-      }
-      // Optionally auto-start next session's alarm here, or wait for user action from popup
-      // For now, we'll require manual start from popup for the next session
-    }
-    broadcastState(); // Send updated state to any open popups
-  }
-});
-
-// Listen for messages from popup
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  console.log("Message received in background:", request);
-  if (request.type === 'GET_TIMER_STATE') {
-    sendResponse(timerState);
-    return true; // Indicates response will be sent asynchronously or keeps message channel open
-  } else if (request.type === 'START_TIMER') {
-    startTimerAlarm();
-    sendResponse({ status: "Timer started" });
-  } else if (request.type === 'PAUSE_TIMER') {
-    pauseTimerAlarm();
-    sendResponse({ status: "Timer paused" });
-  } else if (request.type === 'RESET_TIMER') {
-    resetTimerAlarm();
-    sendResponse({ status: "Timer reset" });
-  } else if (request.type === 'TIMER_ENDED') { // This message comes from popup.js when its interval hits 0
-    // This is slightly redundant if alarms are perfectly in sync, but good for robustness
-    // The alarm listener should primarily handle this.
-    // However, if popup's timer hits 0 first, it tells background.
-    // Background then decides if notification is needed based on its state.
-
-    const wasWorkSession = request.isWork; // isWork:true means the session that *just ended* was a work session
-    if (wasWorkSession) {
-      showNotification("Work session ended! Time for a break.");
-    } else {
-      showNotification("Break's over! Time to focus.");
-    }
-    // Ensure background state is also ready for the next session
-    // This logic is mostly duplicated in the alarm handler, so care must be taken
-    if (!timerState.isPaused) { // If alarm was still somehow running
-        pauseTimerAlarm(); // Pause it
-    }
-    timerState.isWorkSession = !wasWorkSession; // Flip session type
-    timerState.currentTime = timerState.isWorkSession ? timerState.workDuration : timerState.breakDuration;
-    timerState.isPaused = true; // Always pause after a session ends, require manual restart
-    broadcastState();
-    sendResponse({ status: "Notification shown" });
-
-  } else if (request.type === 'UPDATE_SETTINGS') {
-    // Example: chrome.runtime.sendMessage({ type: 'UPDATE_SETTINGS', workDuration: 20*60, breakDuration: 10*60 });
-    updateTimerSettings(request.workDuration, request.breakDuration);
-    if(timerState.isPaused) { // if paused, update the current time to the new duration immediately
-        timerState.currentTime = timerState.isWorkSession ? timerState.workDuration : timerState.breakDuration;
-        broadcastState();
-    }
-    sendResponse({ status: "Settings updated" });
-  }
-  return true; // Keep message channel open for async response
-});
-
-// Function to broadcast the current state to any listening popups
-function broadcastState() {
-  chrome.runtime.sendMessage({
-    type: 'TIMER_STATE_UPDATE',
-    ...timerState
-  }, response => {
-    if (chrome.runtime.lastError) {
-      // console.log("Error broadcasting state or no popup listening:", chrome.runtime.lastError.message);
-    }
-  });
-}
-
-// Initial broadcast in case a popup is already open when the background script reloads
-// (e.g., during development)
-// Note: This might not always work as expected due to timing of popup opening vs. background script loading.
-// The popup's GET_TIMER_STATE on load is more reliable.
-// broadcastState();
-
-console.log("Background script loaded and initialized.");
-// Show a notification on install/update (optional)
-chrome.runtime.onInstalled.addListener((details) => {
-  if (details.reason === "install") {
-    console.log("Extension installed.");
-    showNotification("NeuroFocus Timer installed! Click the icon to start focusing.");
-  } else if (details.reason === "update") {
-    console.log("Extension updated.");
-    // showNotification("NeuroFocus Timer has been updated!");
-  }
-  // Initialize default state in storage (optional, if you want settings to persist across browser restarts more robustly)
-  chrome.storage.local.get(['workDuration', 'breakDuration'], (result) => {
-    if (result.workDuration && result.breakDuration) {
-      timerState.workDuration = result.workDuration;
-      timerState.breakDuration = result.breakDuration;
-    } else {
-      // Store default values if not already there
-      chrome.storage.local.set({
-        workDuration: timerState.workDuration,
-        breakDuration: timerState.breakDuration
-      });
-    }
-    // Always reset to the work session duration when the extension is installed/re-enabled
-    timerState.currentTime = timerState.workDuration;
-    timerState.isPaused = true;
-    timerState.isWorkSession = true;
-    broadcastState();
-  });
-});
-
-// Load settings from storage when the extension starts
-chrome.storage.local.get(['workDuration', 'breakDuration'], (result) => {
-  if (result.workDuration !== undefined) {
-    timerState.workDuration = result.workDuration;
-  }
-  if (result.breakDuration !== undefined) {
-    timerState.breakDuration = result.breakDuration;
-  }
-  // Initialize currentTime based on loaded settings, assuming it's a fresh start or reset.
-  timerState.currentTime = timerState.workDuration;
+function advanceToNextSession() {
   timerState.isPaused = true;
-  timerState.isWorkSession = true;
-  console.log("Initial settings loaded from storage:", timerState);
-  broadcastState(); // Broadcast after loading initial settings
+  chrome.alarms.clear(MAIN_TIMER_ALARM_NAME);
+  let notificationMessage = "";
+
+  if (timerState.currentSessionType === 'WORK') {
+    generateSessionSummary(); // Generate summary text BEFORE resetting break counts
+    timerState.pomodorosCompletedThisCycle++;
+    saveDurationsAndCycleToStorage();
+    notificationMessage = "Focus session complete! Time for a break.";
+    
+    if (timerState.pomodorosCompletedThisCycle >= POMODOROS_UNTIL_LONG_BREAK) {
+      timerState.currentSessionType = 'LONG_BREAK';
+      timerState.currentTime = timerState.longBreakDuration;
+      timerState.pomodorosCompletedThisCycle = 0; // Reset for next cycle
+    } else {
+      timerState.currentSessionType = 'SHORT_BREAK';
+      timerState.currentTime = timerState.shortBreakDuration;
+    }
+    // Reset ad-hoc break counters for the new Pomodoro break session (or next work session)
+    timerState.adHocBreakCountThisSession = 0;
+    timerState.totalAdHocBreakDurationThisSession = 0;
+
+  } else { // Was a SHORT_BREAK or LONG_BREAK
+    notificationMessage = "Break's over! Time to focus.";
+    timerState.currentSessionType = 'WORK';
+    timerState.currentTime = timerState.userSetWorkDuration;
+    timerState.showSessionSummary = false; // Clear summary when moving to a new work session
+    timerState.adHocBreakCountThisSession = 0; // Ensure clean slate for new work session
+    timerState.totalAdHocBreakDurationThisSession = 0;
+  }
+
+  showNotification(notificationMessage);
+  broadcastState(); // Broadcast state with summary and new session info
+}
+
+// --- Ad-hoc Break ---
+function startAdHocBreak() {
+  if (timerState.currentSessionType === 'WORK' && !timerState.isAdHocBreakActive && !timerState.isPaused) {
+    timerState.isPaused = true; // Pause the main work timer
+    chrome.alarms.clear(MAIN_TIMER_ALARM_NAME); // Stop its alarm
+    
+    timerState.isAdHocBreakActive = true;
+    timerState.adHocBreakStartTime = Date.now();
+    timerState.currentAdHocBreakTime = 0;
+    timerState.showSessionSummary = false; // Clear summary when taking a break
+    console.log("Ad-hoc break started. Main timer paused.");
+    broadcastState();
+  }
+}
+
+function finishAdHocBreakAndResume() {
+  if (timerState.isAdHocBreakActive) {
+    const breakDuration = Math.floor((Date.now() - timerState.adHocBreakStartTime) / 1000);
+    timerState.adHocBreakCountThisSession++;
+    timerState.totalAdHocBreakDurationThisSession += breakDuration;
+    
+    console.log(`Ad-hoc break finished. Duration: ${breakDuration}s. Total for session: ${timerState.totalAdHocBreakDurationThisSession}s`);
+    // No notification here, summary comes at end of focus session.
+    
+    timerState.isAdHocBreakActive = false;
+    timerState.adHocBreakStartTime = 0;
+    timerState.currentAdHocBreakTime = 0;
+    
+    // Automatically resume the main WORK timer
+    timerState.isPaused = false; 
+    chrome.alarms.create(MAIN_TIMER_ALARM_NAME, { delayInMinutes: 0, periodInMinutes: 1 / 60 });
+    console.log("Main timer resumed after ad-hoc break.");
+    broadcastState();
+  }
+}
+
+// --- Alarm Listener ---
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === MAIN_TIMER_ALARM_NAME) {
+    if (!timerState.isPaused && !timerState.isAdHocBreakActive) {
+      if (timerState.currentTime > 0) {
+        timerState.currentTime--;
+        broadcastState();
+      } else {
+        advanceToNextSession();
+      }
+    }
+  }
 });
+
+// --- Message Listener ---
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  console.log("Background received message:", request.type, request);
+  switch (request.type) {
+    case 'GET_TIMER_STATE':
+      if (timerState.isAdHocBreakActive && timerState.adHocBreakStartTime > 0) {
+        timerState.currentAdHocBreakTime = Math.floor((Date.now() - timerState.adHocBreakStartTime) / 1000);
+      }
+      sendResponse({ ...timerState });
+      break;
+    case 'MAIN_ACTION_CLICK':
+      if (timerState.isAdHocBreakActive) {
+        finishAdHocBreakAndResume();
+      } else if (timerState.isPaused) { // Covers WORK paused, or any Pomodoro session initially paused
+        startMainTimer();
+      } else if (timerState.currentSessionType === 'WORK' && !timerState.isPaused) { // WORK session is running
+        startAdHocBreak();
+      }
+      // For running Pomodoro breaks (SHORT/LONG), main action button is disabled by popup.js, so no action here.
+      break;
+    case 'RESET_CYCLE':
+      resetPomodoroCycle();
+      break;
+    case 'UPDATE_WORK_DURATION':
+      const newWorkDuration = request.userSetWorkDuration;
+      if (newWorkDuration && newWorkDuration > 0) {
+        timerState.userSetWorkDuration = newWorkDuration;
+        if (timerState.isPaused && timerState.currentSessionType === 'WORK' && !timerState.isAdHocBreakActive) {
+          timerState.currentTime = newWorkDuration;
+        }
+        saveDurationsAndCycleToStorage();
+        console.log("Work duration updated to:", newWorkDuration);
+        broadcastState();
+      }
+      break;
+    default:
+      console.warn("Unknown message type received:", request.type);
+      return false;
+  }
+  return true; 
+});
+
+// --- Extension Lifecycle ---
+chrome.runtime.onInstalled.addListener((details) => {
+  console.log("Extension lifecycle: onInstalled - ", details.reason);
+  loadStateFromStorage(() => {
+    if (details.reason === "install") {
+      showNotification("NeuroFocus Timer installed! Set focus time & start.");
+      saveDurationsAndCycleToStorage(); // Save initial defaults
+    }
+    broadcastState();
+  });
+});
+
+chrome.runtime.onStartup.addListener(() => {
+  console.log("Extension lifecycle: onStartup");
+  loadStateFromStorage(() => {
+    chrome.alarms.clear(MAIN_TIMER_ALARM_NAME); // Clear any orphaned alarms
+    broadcastState();
+  });
+});
+
+// Initial load of state when script first runs
+loadStateFromStorage(broadcastState);
+console.log("Background script loaded and initial state processed.");
+
+// Utility to format time, if needed by notifications from background (already defined in popup)
+// function formatTime(seconds) { ... } // Not strictly needed here if popup handles all time formatting

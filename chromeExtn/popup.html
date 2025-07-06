@@ -5,13 +5,26 @@
   <link rel="stylesheet" type="text/css" href="popup.css">
 </head>
 <body>
-  <div id="timer-display">25:00</div>
-  <div id="controls">
-    <button id="start-button">Start</button>
-    <button id="pause-button">Pause</button>
-    <button id="reset-button">Reset</button>
+  <div id="settings">
+    <label for="work-duration">Focus (minutes):</label>
+    <input type="number" id="work-duration" value="25" min="1">
+    <button id="set-duration-button">Set</button>
   </div>
+
+  <div id="timer-display">25:00</div>
   <div id="status-message">Work Session</div>
+  
+  <div id="main-controls">
+    <button id="main-action-button">Start Focus</button>
+    <button id="reset-button">Reset Cycle</button>
+  </div>
+
+  <div id="adhoc-break-timer-display" style="display: none;">Ad-hoc Break: 00:00</div>
+  
+  <div id="session-summary" style="display: none; margin-top: 15px; padding: 10px; background-color: #e9ecef; border-radius: 4px;">
+    Session summary will appear here.
+  </div>
+
   <script src="popup.js"></script>
 </body>
 </html>

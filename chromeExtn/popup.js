@@ -1,126 +1,184 @@
-// Placeholder for popup script
 console.log("Popup script loaded.");
 
 document.addEventListener('DOMContentLoaded', function () {
+  // --- UI Elements ---
   const timerDisplay = document.getElementById('timer-display');
-  const startButton = document.getElementById('start-button');
-  const pauseButton = document.getElementById('pause-button');
-  const resetButton = document.getElementById('reset-button');
   const statusMessage = document.getElementById('status-message');
+  const workDurationInput = document.getElementById('work-duration');
+  const setDurationButton = document.getElementById('set-duration-button');
+  const mainActionButton = document.getElementById('main-action-button');
+  const resetButton = document.getElementById('reset-button');
+  const adhocBreakTimerDisplay = document.getElementById('adhoc-break-timer-display');
+  const sessionSummaryDisplay = document.getElementById('session-summary');
 
-  // Initial timer values (example: 25 minutes work)
-  let workDuration = 25 * 60; // in seconds
-  let breakDuration = 5 * 60; // in seconds
-  let currentTime = workDuration;
-  let isPaused = true;
-  let isWorkSession = true;
-  let timerInterval;
+  // --- Local State for UI updates ---
+  let localMainTimerInterval = null;
+  let localAdhocBreakInterval = null;
+  let currentLocalAdhocBreakTime = 0; // To display ad-hoc break time smoothly
 
-  function updateDisplay() {
-    const minutes = Math.floor(currentTime / 60);
-    const seconds = currentTime % 60;
-    timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  // --- Utility Functions ---
+  function formatTime(totalSeconds) {
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   }
 
-  function startTimer() {
-    if (isPaused) {
-      isPaused = false;
-      startButton.textContent = 'Start'; // Or disable if you prefer
-      timerInterval = setInterval(() => {
-        if (currentTime > 0) {
-          currentTime--;
-          updateDisplay();
+  function updateMainTimerDisplay(currentTime) {
+    timerDisplay.textContent = formatTime(currentTime);
+  }
+
+  function updateAdhocBreakTimerDisplay(breakTime) {
+    adhocBreakTimerDisplay.textContent = `Ad-hoc Break: ${formatTime(breakTime)}`;
+  }
+
+  // --- UI Update Logic based on State from Background ---
+  function updateUI(state) {
+    console.log("Popup received state for UI update:", state);
+
+    // Update displays
+    updateMainTimerDisplay(state.currentTime);
+    statusMessage.textContent = getStatusMessage(state);
+    workDurationInput.value = state.userSetWorkDuration / 60;
+
+    // Main Action Button: Text, Class, Disabled status
+    mainActionButton.className = 'main-action-button'; // Reset classes
+    if (state.isAdHocBreakActive) {
+      mainActionButton.textContent = 'Finish Break';
+      mainActionButton.classList.add('finish-break');
+      mainActionButton.disabled = false;
+      adhocBreakTimerDisplay.style.display = 'block';
+      if (!localAdhocBreakInterval) { // Start local adhoc counter if not already running
+        currentLocalAdhocBreakTime = state.currentAdHocBreakTime || 0;
+        updateAdhocBreakTimerDisplay(currentLocalAdhocBreakTime);
+        localAdhocBreakInterval = setInterval(() => {
+          currentLocalAdhocBreakTime++;
+          updateAdhocBreakTimerDisplay(currentLocalAdhocBreakTime);
+        }, 1000);
+      }
+    } else if (state.currentSessionType === 'WORK' && !state.isPaused) {
+      mainActionButton.textContent = 'Take a Break';
+      mainActionButton.classList.add('take-break');
+      mainActionButton.disabled = false;
+      adhocBreakTimerDisplay.style.display = 'none';
+      if (localAdhocBreakInterval) clearInterval(localAdhocBreakInterval);
+      localAdhocBreakInterval = null;
+    } else if (state.isPaused) { // Covers WORK paused, or any session type when initially paused
+      mainActionButton.textContent = 'Start Focus';
+      if (state.currentSessionType === 'WORK') mainActionButton.textContent = 'Resume Focus';
+      if (state.currentSessionType === 'SHORT_BREAK') mainActionButton.textContent = 'Start Short Break';
+      if (state.currentSessionType === 'LONG_BREAK') mainActionButton.textContent = 'Start Long Break';
+      mainActionButton.classList.add('start');
+      mainActionButton.disabled = false;
+      adhocBreakTimerDisplay.style.display = 'none';
+      if (localAdhocBreakInterval) clearInterval(localAdhocBreakInterval);
+      localAdhocBreakInterval = null;
+    } else { // Default for non-WORK sessions that are running (e.g. Pomodoro breaks)
+      mainActionButton.textContent = 'Break in Progress';
+      mainActionButton.classList.add('disabled'); // Make it look disabled
+      mainActionButton.disabled = true; // Actually disable it
+      adhocBreakTimerDisplay.style.display = 'none';
+      if (localAdhocBreakInterval) clearInterval(localAdhocBreakInterval);
+      localAdhocBreakInterval = null;
+    }
+    
+    // Reset button is disabled if an ad-hoc break is active
+    resetButton.disabled = state.isAdHocBreakActive;
+    // Set duration button is disabled if timer is running or ad-hoc break active
+    setDurationButton.disabled = (!state.isPaused && state.currentSessionType === 'WORK') || state.isAdHocBreakActive;
+
+
+    // Manage local interval for main timer display (smooth countdown)
+    if (localMainTimerInterval) clearInterval(localMainTimerInterval);
+    if (!state.isPaused && !state.isAdHocBreakActive) {
+      let displayTime = state.currentTime; // Use state's time as authoritative start
+      updateMainTimerDisplay(displayTime); // Update immediately
+      localMainTimerInterval = setInterval(() => {
+        if (displayTime > 0) {
+          displayTime--;
+          updateMainTimerDisplay(displayTime);
         } else {
-          // Timer reached zero
-          clearInterval(timerInterval);
-          isPaused = true;
-          // Switch session type
-          isWorkSession = !isWorkSession;
-          currentTime = isWorkSession ? workDuration : breakDuration;
-          statusMessage.textContent = isWorkSession ? "Work Session" : "Break Time!";
-          updateDisplay();
-          // Notify background script to show notification
-          chrome.runtime.sendMessage({
-            type: 'TIMER_ENDED',
-            isWork: !isWorkSession // If it *was* work, now it's break, and vice-versa
-          });
-          // Potentially auto-start next session or wait for user
+          clearInterval(localMainTimerInterval);
+          localMainTimerInterval = null;
+          // Rely on background state update for session change
         }
       }, 1000);
     }
+
+    // Session Summary Display
+    if (state.showSessionSummary) {
+        sessionSummaryDisplay.textContent = state.sessionSummaryText;
+        sessionSummaryDisplay.style.display = 'block';
+    } else {
+        sessionSummaryDisplay.style.display = 'none';
+    }
   }
 
-  function pauseTimer() {
-    isPaused = true;
-    clearInterval(timerInterval);
-    startButton.textContent = 'Resume';
+  function getStatusMessage(state) {
+    if (state.isAdHocBreakActive) return "Ad-hoc Break Active";
+    switch (state.currentSessionType) {
+      case 'WORK':
+        return state.isPaused ? "Focus Paused" : "Focus Session";
+      case 'SHORT_BREAK':
+        return state.isPaused ? "Short Break Paused" : "Short Break";
+      case 'LONG_BREAK':
+        return state.isPaused ? "Long Break Paused" : "Long Break";
+      default:
+        return "Ready";
+    }
   }
 
-  function resetTimer() {
-    clearInterval(timerInterval);
-    isPaused = true;
-    isWorkSession = true; // Default to work session
-    currentTime = workDuration;
-    statusMessage.textContent = "Work Session";
-    startButton.textContent = 'Start';
-    updateDisplay();
-  }
-
-  startButton.addEventListener('click', () => {
-    if (isPaused && startButton.textContent === 'Resume') {
-        startTimer();
-    } else if (isPaused) {
-        startTimer();
+  // --- Event Listeners ---
+  setDurationButton.addEventListener('click', () => {
+    const newDurationMinutes = parseInt(workDurationInput.value, 10);
+    if (newDurationMinutes > 0) {
+      chrome.runtime.sendMessage({
+        type: 'UPDATE_WORK_DURATION', // More specific
+        userSetWorkDuration: newDurationMinutes * 60,
+      });
+      // UI will update via broadcast state from background
     }
   });
-  pauseButton.addEventListener('click', pauseTimer);
-  resetButton.addEventListener('click', resetTimer);
 
-  // Initialize display
-  updateDisplay();
+  mainActionButton.addEventListener('click', () => {
+    // The action type is determined by the button's current text/state,
+    // but it's simpler to send a generic 'MAIN_ACTION' and let background decide
+    // based on its authoritative state.
+    chrome.runtime.sendMessage({ type: 'MAIN_ACTION_CLICK' });
+    // UI will update via broadcast state from background
+  });
 
-  // Listen for state updates from background script (e.g., timer running in another popup instance or from background)
+  resetButton.addEventListener('click', () => {
+    chrome.runtime.sendMessage({ type: 'RESET_CYCLE' });
+    // UI will update via broadcast state from background
+  });
+
+  // --- Initialization ---
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.type === 'TIMER_STATE_UPDATE') {
-      currentTime = request.currentTime;
-      isPaused = request.isPaused;
-      isWorkSession = request.isWorkSession;
-      workDuration = request.workDuration;
-      breakDuration = request.breakDuration;
-      statusMessage.textContent = isWorkSession ? "Work Session" : "Break Time!";
-      updateDisplay();
-      if (!isPaused) {
-        startTimer(); // Resume timer if it was running
-      }
+      updateUI(request.state);
     }
+    return true; 
   });
 
-  // Request current timer state from background script when popup opens
-  chrome.runtime.sendMessage({ type: 'GET_TIMER_STATE' }, (response) => {
-    if (chrome.runtime.lastError) {
-        console.error("Error getting timer state:", chrome.runtime.lastError.message);
-        // Proceed with default initialization if background isn't ready or there's an error
-        resetTimer(); // Or some other default state
+  function requestInitialState() {
+    chrome.runtime.sendMessage({ type: 'GET_TIMER_STATE' }, (response) => {
+      if (chrome.runtime.lastError) {
+        console.error("Error getting initial state:", chrome.runtime.lastError.message);
+        timerDisplay.textContent = "Error";
+        statusMessage.textContent = "Cannot load";
+        mainActionButton.disabled = true;
+        resetButton.disabled = true;
+        setDurationButton.disabled = true;
         return;
-    }
-    if (response) {
-        currentTime = response.currentTime;
-        isPaused = response.isPaused;
-        isWorkSession = response.isWorkSession;
-        workDuration = response.workDuration; // Assuming these are part of the state
-        breakDuration = response.breakDuration;
-        statusMessage.textContent = isWorkSession ? "Work Session" : "Break Time!";
-        updateDisplay();
-        if (!isPaused) {
-            // If timer was running and popup is opened, ensure interval is restarted for the popup's context
-            // The actual timing should be driven by alarms in background.js
-            // This startTimer() here is more about re-syncing the popup's countdown display interval.
-            startTimer();
-        }
-         startButton.textContent = isPaused ? (currentTime === (isWorkSession ? workDuration : breakDuration) ? 'Start' : 'Resume') : 'Start';
-    } else {
-        // If no response, initialize with defaults
-        resetTimer();
-    }
-  });
+      }
+      if (response) {
+        updateUI(response);
+      } else {
+        console.warn("No initial state from background.");
+        // UI might show loading or default disabled state
+      }
+    });
+  }
+
+  requestInitialState();
 });

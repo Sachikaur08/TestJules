@@ -1,50 +1,141 @@
 body {
-  font-family: sans-serif;
-  width: 250px;
-  padding: 10px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  width: 300px; /* Slightly wider for new summary */
+  padding: 15px;
   text-align: center;
-  background-color: #f0f0f0;
-}
-
-#timer-display {
-  font-size: 3em;
-  margin-bottom: 20px;
+  background-color: #f4f6f8;
   color: #333;
 }
 
-#controls button {
-  font-size: 1em;
-  padding: 8px 15px;
-  margin: 5px;
-  cursor: pointer;
-  border: none;
-  border-radius: 5px;
-  background-color: #4CAF50;
+#settings {
+  margin-bottom: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+#settings label {
+  font-size: 0.9em;
+  margin-right: 5px;
+}
+
+#settings input[type="number"] {
+  width: 60px;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 0.9em;
+  text-align: center;
+}
+
+#settings button {
+  padding: 8px 12px;
+  font-size: 0.9em;
+  background-color: #007bff;
   color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s ease-in-out;
 }
 
-#controls button:hover {
-  background-color: #45a049;
+#settings button:hover {
+  background-color: #0056b3;
 }
 
-#controls #pause-button {
-  background-color: #ffc107;
-}
-
-#controls #pause-button:hover {
-  background-color: #e0a800;
-}
-
-#controls #reset-button {
-  background-color: #f44336;
-}
-
-#controls #reset-button:hover {
-  background-color: #da190b;
+#timer-display {
+  font-size: 3.8em;
+  font-weight: bold;
+  margin-bottom: 8px;
+  color: #2c3e50;
 }
 
 #status-message {
-  margin-top: 15px;
-  font-size: 1.1em;
+  margin-bottom: 12px;
+  font-size: 1.25em;
   color: #555;
+  font-weight: 500;
+  min-height: 1.25em; /* Prevent layout shift */
+}
+
+#main-controls {
+  display: flex;
+  justify-content: center; /* Center buttons */
+  gap: 10px; /* Space between buttons */
+  margin-bottom: 10px;
+}
+
+#main-controls button {
+  font-size: 1em;
+  padding: 12px 20px; /* Larger buttons */
+  cursor: pointer;
+  border: none;
+  border-radius: 5px;
+  color: white;
+  transition: background-color 0.2s ease-in-out;
+  flex-grow: 1; /* Allow buttons to grow */
+  max-width: 150px; /* Max width for main action */
+}
+
+#main-action-button.start {
+  background-color: #28a745; /* Green */
+}
+#main-action-button.start:hover {
+  background-color: #218838;
+}
+
+#main-action-button.take-break {
+  background-color: #ffc107; /* Yellow */
+  color: #212529;
+}
+#main-action-button.take-break:hover {
+  background-color: #e0a800;
+}
+
+#main-action-button.finish-break {
+  background-color: #17a2b8; /* Teal */
+}
+#main-action-button.finish-break:hover {
+  background-color: #138496;
+}
+#main-action-button.disabled { /* For when timer is in non-interactive state e.g. pomodoro break */
+    background-color: #6c757d; /* Grey */
+    cursor: not-allowed;
+}
+#main-action-button.disabled:hover {
+    background-color: #5a6268;
+}
+
+
+#reset-button {
+  background-color: #dc3545; /* Red */
+  flex-grow: 0.5; /* Smaller reset button */
+  max-width: 120px;
+}
+#reset-button:hover {
+  background-color: #c82333;
+}
+#reset-button:disabled {
+    background-color: #868e96;
+    cursor: not-allowed;
+}
+
+
+#adhoc-break-timer-display {
+  margin-top: 8px;
+  margin-bottom: 8px;
+  font-size: 1.1em;
+  color: #17a2b8; /* Teal to match finish break */
+  font-weight: 500;
+}
+
+#session-summary {
+  margin-top: 15px;
+  padding: 12px;
+  background-color: #e9ecef; /* Light grey background */
+  border-radius: 5px;
+  font-size: 0.95em;
+  color: #495057; /* Darker grey text */
+  line-height: 1.4;
+  border: 1px solid #ced4da;
 }
