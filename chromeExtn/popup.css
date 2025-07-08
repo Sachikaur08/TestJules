@@ -84,18 +84,18 @@ body {
   background-color: #218838;
 }
 
-#main-action-button.take-break {
+#main-action-button.take-timeout {
   background-color: #ffc107; /* Yellow */
   color: #212529;
 }
-#main-action-button.take-break:hover {
+#main-action-button.take-timeout:hover {
   background-color: #e0a800;
 }
 
-#main-action-button.finish-break {
+#main-action-button.finish-timeout {
   background-color: #17a2b8; /* Teal */
 }
-#main-action-button.finish-break:hover {
+#main-action-button.finish-timeout:hover {
   background-color: #138496;
 }
 #main-action-button.disabled { /* For when timer is in non-interactive state e.g. pomodoro break */

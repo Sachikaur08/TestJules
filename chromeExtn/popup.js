@@ -8,13 +8,13 @@ document.addEventListener('DOMContentLoaded', function () {
   const setDurationButton = document.getElementById('set-duration-button');
   const mainActionButton = document.getElementById('main-action-button');
   const resetButton = document.getElementById('reset-button');
-  const adhocBreakTimerDisplay = document.getElementById('adhoc-break-timer-display');
+  const adhocTimeoutTimerDisplay = document.getElementById('adhoc-timeout-timer-display');
   const sessionSummaryDisplay = document.getElementById('session-summary');
 
   // --- Local State for UI updates ---
   let localMainTimerInterval = null;
-  let localAdhocBreakInterval = null;
-  let currentLocalAdhocBreakTime = 0; // To display ad-hoc break time smoothly
+  let localAdhocTimeoutInterval = null;
+  let currentLocalAdhocTimeoutTime = 0; // To display ad-hoc timeout time smoothly
 
   // --- Utility Functions ---
   function formatTime(totalSeconds) {
@@ -27,8 +27,8 @@ document.addEventListener('DOMContentLoaded', function () {
     timerDisplay.textContent = formatTime(currentTime);
   }
 
-  function updateAdhocBreakTimerDisplay(breakTime) {
-    adhocBreakTimerDisplay.textContent = `Ad-hoc Break: ${formatTime(breakTime)}`;
+  function updateAdhocTimeoutTimerDisplay(timeoutTime) {
+    adhocTimeoutTimerDisplay.textContent = `Timeout: ${formatTime(timeoutTime)}`;
   }
 
   // --- UI Update Logic based on State from Background ---
@@ -42,54 +42,81 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Main Action Button: Text, Class, Disabled status
     mainActionButton.className = 'main-action-button'; // Reset classes
-    if (state.isAdHocBreakActive) {
-      mainActionButton.textContent = 'Finish Break';
-      mainActionButton.classList.add('finish-break');
+
+    if (state.isOutsideActiveHours) {
+        mainActionButton.textContent = 'Outside Schedule';
+        mainActionButton.classList.add('disabled');
+        mainActionButton.disabled = true;
+        statusMessage.textContent = `Scheduled: ${state.settings?.startTime || 'N/A'} - ${state.settings?.endTime || 'N/A'}`;
+        adhocTimeoutTimerDisplay.style.display = 'none';
+        if (localAdhocTimeoutInterval) clearInterval(localAdhocTimeoutInterval);
+        localAdhocTimeoutInterval = null;
+        setDurationButton.disabled = true; // Disable duration setting from popup if outside hours
+        resetButton.disabled = true; // Also disable reset if outside hours
+    } else if (state.isAdHocTimeoutActive) { 
+      mainActionButton.textContent = 'Finish Timeout'; 
+      mainActionButton.classList.add('finish-timeout'); 
       mainActionButton.disabled = false;
-      adhocBreakTimerDisplay.style.display = 'block';
-      if (!localAdhocBreakInterval) { // Start local adhoc counter if not already running
-        currentLocalAdhocBreakTime = state.currentAdHocBreakTime || 0;
-        updateAdhocBreakTimerDisplay(currentLocalAdhocBreakTime);
-        localAdhocBreakInterval = setInterval(() => {
-          currentLocalAdhocBreakTime++;
-          updateAdhocBreakTimerDisplay(currentLocalAdhocBreakTime);
+      adhocTimeoutTimerDisplay.style.display = 'block';
+      if (!localAdhocTimeoutInterval) { 
+        currentLocalAdhocTimeoutTime = state.currentAdHocTimeoutTime || 0; 
+        updateAdhocTimeoutTimerDisplay(currentLocalAdhocTimeoutTime);
+        localAdhocTimeoutInterval = setInterval(() => {
+          currentLocalAdhocTimeoutTime++;
+          updateAdhocTimeoutTimerDisplay(currentLocalAdhocTimeoutTime);
         }, 1000);
       }
+      setDurationButton.disabled = true; // Cannot change duration during timeout
+      resetButton.disabled = true; // Cannot reset during timeout
     } else if (state.currentSessionType === 'WORK' && !state.isPaused) {
-      mainActionButton.textContent = 'Take a Break';
-      mainActionButton.classList.add('take-break');
+      mainActionButton.textContent = 'Take a Timeout'; 
+      mainActionButton.classList.add('take-timeout'); 
       mainActionButton.disabled = false;
-      adhocBreakTimerDisplay.style.display = 'none';
-      if (localAdhocBreakInterval) clearInterval(localAdhocBreakInterval);
-      localAdhocBreakInterval = null;
-    } else if (state.isPaused) { // Covers WORK paused, or any session type when initially paused
-      mainActionButton.textContent = 'Start Focus';
-      if (state.currentSessionType === 'WORK') mainActionButton.textContent = 'Resume Focus';
-      if (state.currentSessionType === 'SHORT_BREAK') mainActionButton.textContent = 'Start Short Break';
-      if (state.currentSessionType === 'LONG_BREAK') mainActionButton.textContent = 'Start Long Break';
+      adhocTimeoutTimerDisplay.style.display = 'none';
+      if (localAdhocTimeoutInterval) clearInterval(localAdhocTimeoutInterval);
+      localAdhocTimeoutInterval = null;
+      setDurationButton.disabled = true; // Cannot change duration while work session is running
+      resetButton.disabled = false;
+    } else if (state.isPaused) { 
+      // Determine appropriate text for "Start/Resume" based on session type
+      if (state.currentSessionType === 'WORK') {
+        mainActionButton.textContent = (state.currentTime === (state.settings?.userSetWorkDuration)) ? 'Start Focus' : 'Resume Focus';
+      } else if (state.currentSessionType === 'SHORT_BREAK') {
+        mainActionButton.textContent = 'Start Short Break';
+      } else if (state.currentSessionType === 'LONG_BREAK') {
+        mainActionButton.textContent = 'Start Long Break';
+      } else {
+         mainActionButton.textContent = 'Start'; // Generic fallback
+      }
       mainActionButton.classList.add('start');
       mainActionButton.disabled = false;
-      adhocBreakTimerDisplay.style.display = 'none';
-      if (localAdhocBreakInterval) clearInterval(localAdhocBreakInterval);
-      localAdhocBreakInterval = null;
+      adhocTimeoutTimerDisplay.style.display = 'none';
+      if (localAdhocTimeoutInterval) clearInterval(localAdhocTimeoutInterval);
+      localAdhocTimeoutInterval = null;
+      // Allow setting duration only if it's a work session that's fully reset or at the very start
+      setDurationButton.disabled = !(state.currentSessionType === 'WORK' && state.currentTime === (state.settings?.userSetWorkDuration));
+      resetButton.disabled = false;
     } else { // Default for non-WORK sessions that are running (e.g. Pomodoro breaks)
       mainActionButton.textContent = 'Break in Progress';
-      mainActionButton.classList.add('disabled'); // Make it look disabled
-      mainActionButton.disabled = true; // Actually disable it
-      adhocBreakTimerDisplay.style.display = 'none';
-      if (localAdhocBreakInterval) clearInterval(localAdhocBreakInterval);
-      localAdhocBreakInterval = null;
+      mainActionButton.classList.add('disabled'); 
+      mainActionButton.disabled = true; 
+      adhocTimeoutTimerDisplay.style.display = 'none';
+      if (localAdhocTimeoutInterval) clearInterval(localAdhocTimeoutInterval);
+      localAdhocTimeoutInterval = null;
+      setDurationButton.disabled = true;
+      resetButton.disabled = false; // Allow resetting even during a running Pomodoro break
     }
     
-    // Reset button is disabled if an ad-hoc break is active
-    resetButton.disabled = state.isAdHocBreakActive;
-    // Set duration button is disabled if timer is running or ad-hoc break active
-    setDurationButton.disabled = (!state.isPaused && state.currentSessionType === 'WORK') || state.isAdHocBreakActive;
+    // This logic for disabling reset/set duration might be redundant if covered above, but keep for now.
+    // Reset button is disabled if an ad-hoc timeout is active
+    // resetButton.disabled = state.isAdHocTimeoutActive; 
+    // Set duration button is disabled if timer is running or ad-hoc timeout active
+    // setDurationButton.disabled = (!state.isPaused && state.currentSessionType === 'WORK') || state.isAdHocTimeoutActive;
 
 
     // Manage local interval for main timer display (smooth countdown)
     if (localMainTimerInterval) clearInterval(localMainTimerInterval);
-    if (!state.isPaused && !state.isAdHocBreakActive) {
+    if (!state.isPaused && !state.isAdHocTimeoutActive) { // Updated variable name
       let displayTime = state.currentTime; // Use state's time as authoritative start
       updateMainTimerDisplay(displayTime); // Update immediately
       localMainTimerInterval = setInterval(() => {
@@ -114,16 +141,23 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   function getStatusMessage(state) {
-    if (state.isAdHocBreakActive) return "Ad-hoc Break Active";
+    if (state.isOutsideActiveHours && state.settings) { // Check settings exist
+        return `Scheduled: ${state.settings.startTime} - ${state.settings.endTime}`;
+    }
+    if (state.isAdHocTimeoutActive) return "Timeout Active";
     switch (state.currentSessionType) {
       case 'WORK':
+        // Provide more specific status for WORK session if it's fully reset vs. paused mid-way
+        if (state.isPaused && state.currentTime === (state.settings?.userSetWorkDuration)) return "Ready to Focus";
         return state.isPaused ? "Focus Paused" : "Focus Session";
       case 'SHORT_BREAK':
+        if (state.isPaused && state.currentTime === (state.settings?.shortBreakDuration)) return "Ready for Short Break";
         return state.isPaused ? "Short Break Paused" : "Short Break";
       case 'LONG_BREAK':
+        if (state.isPaused && state.currentTime === (state.settings?.longBreakDuration)) return "Ready for Long Break";
         return state.isPaused ? "Long Break Paused" : "Long Break";
       default:
-        return "Ready";
+        return "Ready"; // Should ideally not be reached if currentSessionType is always valid
     }
   }
 
