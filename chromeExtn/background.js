@@ -13,6 +13,15 @@ let settings = {
 const MAIN_TIMER_ALARM_NAME = 'pomodoroMainTimer';
 const DAILY_SCHEDULER_ALARM_NAME = 'dailyActivationScheduler';
 
+const DISTRACTING_SITES = [
+    'youtube.com', 
+    'www.youtube.com',
+    'instagram.com',
+    'www.instagram.com',
+    'web.whatsapp.com' 
+    // Note: No 'www.' for web.whatsapp.com as it's usually the direct hostname
+];
+
 let timerState = {
   // Durations will now come from 'settings' object once loaded
   currentTime: settings.userSetWorkDuration, // Initialized with default, updated on settings load
@@ -29,10 +38,12 @@ let timerState = {
   showSessionSummary: false,
   sessionSummaryText: "",
 
-  isOutsideActiveHours: true, // Assume outside initially, until checked
+  isOutsideActiveHours: true, 
+  currentSessionActualStartTime: 0,
   
-  // For logging - to capture actual start time of a session
-  currentSessionActualStartTime: 0 
+  // For Distraction Tracking
+  currentWorkSessionDistractions: {}, // e.g., {'youtube.com': 120, 'instagram.com': 60}
+  currentlyTrackedDistractingSite: null // e.g., { hostname: 'youtube.com', startTime: timestamp }
 };
 
 // --- Helper Functions ---
@@ -188,6 +199,12 @@ function resetPomodoroCycle() {
   timerState.adHocTimeoutCountThisSession = 0; 
   timerState.totalAdHocTimeoutDurationThisSession = 0; 
   timerState.showSessionSummary = false;
+    
+    // Reset distraction tracking for the new cycle
+    stopCurrentDistractionTracking(false); // Stop any active, but don't log as it's a reset
+    timerState.currentWorkSessionDistractions = {};
+    timerState.currentlyTrackedDistractingSite = null;
+
   checkIfOutsideActiveHours(); // Re-check active hours status
   console.log("Pomodoro cycle reset.");
   // Save pomodorosCompletedThisCycle to storage, as it's part of cycle config
@@ -240,12 +257,15 @@ function advanceToNextSession() {
         startTime: timerState.currentSessionActualStartTime,
         endTime: sessionEndTime,
         plannedDuration: plannedDuration,
-        actualDuration: Math.floor((sessionEndTime - timerState.currentSessionActualStartTime) / 1000), // Approximate
-        // For WORK sessions, include ad-hoc timeout summary from timerState
+        actualDuration: Math.floor((sessionEndTime - timerState.currentSessionActualStartTime) / 1000), 
         adHocTimeoutCount: timerState.adHocTimeoutCountThisSession,
-        totalAdHocTimeoutDuration: timerState.totalAdHocTimeoutDurationThisSession
-        // Detailed ad-hoc logs could be added here if we store them in timerState temporarily
+        totalAdHocTimeoutDuration: timerState.totalAdHocTimeoutDurationThisSession,
+        distractions: { ...timerState.currentWorkSessionDistractions } // Log recorded distractions
     });
+
+    // Stop any active distraction tracking before moving to break/next session
+    stopCurrentDistractionTracking(true); 
+
     generateSessionSummary(); 
     timerState.pomodorosCompletedThisCycle++;
     chrome.storage.local.set({ pomodorosCompletedThisCycle: timerState.pomodorosCompletedThisCycle });
@@ -287,7 +307,10 @@ function advanceToNextSession() {
     timerState.currentTime = settings.userSetWorkDuration; 
     timerState.showSessionSummary = false; 
     timerState.adHocTimeoutCountThisSession = 0; 
-    timerState.totalAdHocTimeoutDurationThisSession = 0; 
+    timerState.totalAdHocTimeoutDurationThisSession = 0;
+    // Reset distraction data for the new WORK session
+    timerState.currentWorkSessionDistractions = {};
+    timerState.currentlyTrackedDistractingSite = null;
   }
 
   showNotification(notificationMessage);
@@ -314,7 +337,9 @@ function startAdHocTimeout() {
     };
     timerState.currentAdHocTimeoutTime = 0; 
     timerState.showSessionSummary = false; 
-    console.log("Ad-hoc timeout started. Main timer paused."); 
+    console.log("Ad-hoc timeout started. Main timer paused.");
+    // No need to call stopCurrentDistractionTracking here, as handleTabActivity will stop it
+    // when the timer state becomes paused or adHocTimeoutActive.
     broadcastState();
   }
 }
@@ -346,17 +371,20 @@ function finishAdHocTimeoutAndResume() {
     timerState.isAdHocTimeoutActive = false; 
     timerState.adHocTimeoutStartTime = 0; 
     timerState.currentAdHocTimeoutTime = 0;
-    // Check if we should resume or if we are now outside active hours
+    
+    // After finishing an ad-hoc timeout, the timer should resume.
+    // The handleTabActivity() will then re-evaluate if distraction tracking should start
+    // based on the currently active tab when the timer resumes.
     if (checkIfOutsideActiveHours()) {
         showNotification("Scheduled active time has ended. Timer will remain paused.");
         console.log("Ad-hoc timeout finished, but now outside active hours. Main timer remains paused.");
-        // timerState.isPaused is already true from startAdHocTimeout or will be set by checkIfOutsideActiveHours if it stops a running timer
-        // No need to create MAIN_TIMER_ALARM
+        // timerState.isPaused is true (set by startAdHocTimeout or by checkIfOutsideActiveHours)
     } else {
-        // Automatically resume the main WORK timer
-        timerState.isPaused = false;
+        timerState.isPaused = false; // Resume the main WORK timer
         chrome.alarms.create(MAIN_TIMER_ALARM_NAME, { delayInMinutes: 0, periodInMinutes: 1 / 60 });
         console.log("Main timer resumed after ad-hoc timeout.");
+        // Immediately check current tab in case it's a distracting one
+        handleTabActivity(); 
     }
     broadcastState();
   }
@@ -516,3 +544,128 @@ chrome.runtime.onStartup.addListener(() => {
 // Initial load of settings and state when script first runs
 loadSettingsAndInitializeState(broadcastState);
 console.log("Background script loaded and initial settings/state processed.");
+
+
+// --- Distraction Tracking Logic ---
+
+function getHostname(url) {
+    if (!url) return null;
+    try {
+        return new URL(url).hostname;
+    } catch (e) {
+        // console.warn("Could not parse URL for hostname:", url, e);
+        return null;
+    }
+}
+
+function stopCurrentDistractionTracking(logToConsole = false) {
+    if (timerState.currentlyTrackedDistractingSite) {
+        const durationSeconds = Math.floor((Date.now() - timerState.currentlyTrackedDistractingSite.startTime) / 1000);
+        const siteHostname = timerState.currentlyTrackedDistractingSite.hostname;
+
+        if (durationSeconds > 0) {
+            timerState.currentWorkSessionDistractions[siteHostname] = (timerState.currentWorkSessionDistractions[siteHostname] || 0) + durationSeconds;
+            if(logToConsole) console.log(`Tracked ${durationSeconds}s on ${siteHostname}. Total for session: ${timerState.currentWorkSessionDistractions[siteHostname]}s`);
+        }
+        timerState.currentlyTrackedDistractingSite = null;
+        // No broadcastState here, will be broadcasted by calling function or next timer tick
+    }
+}
+
+function startDistractionTracking(hostname) {
+    // Stop any existing tracking first (e.g. if rapidly switching between distracting sites)
+    if (timerState.currentlyTrackedDistractingSite && timerState.currentlyTrackedDistractingSite.hostname !== hostname) {
+        stopCurrentDistractionTracking(true); 
+    }
+    // Start new tracking only if not already tracking this same site
+    if (!timerState.currentlyTrackedDistractingSite || timerState.currentlyTrackedDistractingSite.hostname !== hostname) {
+        timerState.currentlyTrackedDistractingSite = { hostname: hostname, startTime: Date.now() };
+        console.log("Started tracking distraction:", hostname);
+    }
+}
+
+
+async function handleTabActivity() {
+    // Conditions for active tracking
+    if (timerState.currentSessionType !== 'WORK' || timerState.isPaused || timerState.isAdHocTimeoutActive || timerState.isOutsideActiveHours) {
+        if (timerState.currentlyTrackedDistractingSite) {
+            console.log("WORK session no longer active/valid for tracking. Stopping distraction tracking.");
+            stopCurrentDistractionTracking(true);
+            broadcastState(); // Ensure popup knows about stopped distraction if it was displayed
+        }
+        return;
+    }
+
+    try {
+        // Get the currently active tab in the currently focused window
+        const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+
+        if (!activeTab || !activeTab.url) {
+            // No active tab or no URL (e.g. new tab page, incognito without permission if applicable)
+            if (timerState.currentlyTrackedDistractingSite) {
+                console.log("Active tab has no URL or not found. Stopping distraction tracking.");
+                stopCurrentDistractionTracking(true);
+                // broadcastState(); // Consider if a broadcast is needed here
+            }
+            return;
+        }
+        
+        const currentHostname = getHostname(activeTab.url);
+
+        if (DISTRACTING_SITES.includes(currentHostname)) {
+            // If not already tracking this site, or if it's a different distracting site
+            if (!timerState.currentlyTrackedDistractingSite || timerState.currentlyTrackedDistractingSite.hostname !== currentHostname) {
+                startDistractionTracking(currentHostname);
+            }
+            // If already tracking this exact site, do nothing, let it continue.
+        } else {
+            // Current tab is not a distracting site, so stop tracking if we were.
+            if (timerState.currentlyTrackedDistractingSite) {
+                console.log(`Switched to non-distracting site (${currentHostname}). Stopping tracking for ${timerState.currentlyTrackedDistractingSite.hostname}.`);
+                stopCurrentDistractionTracking(true);
+            }
+        }
+    } catch (error) {
+        console.error("Error in handleTabActivity:", error);
+        // Ensure tracking is stopped on error to prevent inconsistent states
+        if (timerState.currentlyTrackedDistractingSite) {
+            stopCurrentDistractionTracking(false); // Don't log to console again if error is the reason
+        }
+    }
+    // No broadcastState here by default, as this can fire very frequently.
+    // State changes relevant to UI (like total distraction time) are handled by timer ticks or session changes.
+}
+
+
+// --- Event Listeners for Tab Activity ---
+// Fires when the active tab in a window changes
+chrome.tabs.onActivated.addListener(activeInfo => {
+    console.log("Tab activated:", activeInfo.tabId);
+    handleTabActivity();
+});
+
+// Fires when a tab is updated (e.g., URL changes)
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+    // We only care about updates to the *active* tab in the *current* window.
+    // And only if URL changes or status is complete (to avoid premature checks on loading tabs)
+    if (tab.active && (changeInfo.url || changeInfo.status === 'complete')) {
+        console.log("Tab updated:", tabId, "ChangeInfo:", changeInfo.status, changeInfo.url);
+        handleTabActivity();
+    }
+});
+
+// Fires when the focused window changes
+chrome.windows.onFocusChanged.addListener(windowId => {
+    console.log("Window focus changed to:", windowId);
+    if (windowId === chrome.windows.WINDOW_ID_NONE) {
+        // Browser window lost focus (e.g., user clicked on another app)
+        if (timerState.currentlyTrackedDistractingSite) {
+            console.log("Browser window lost focus. Stopping distraction tracking.");
+            stopCurrentDistractionTracking(true);
+            // broadcastState(); // Maybe broadcast if this implies a pause in activity
+        }
+    } else {
+        // A Chrome window gained focus, check its active tab.
+        handleTabActivity();
+    }
+});

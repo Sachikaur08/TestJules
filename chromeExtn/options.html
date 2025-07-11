@@ -90,6 +90,8 @@
             border: 1px solid #e0e0e0;
             border-radius: 5px;
             background-color: #fdfdfd;
+            height: 350px; /* Constrain height */
+            position: relative; /* For potential absolute positioning of canvas if needed, or for Chart.js to better understand bounds */
         }
         .chart-title {
             font-weight: 500;
@@ -97,10 +99,11 @@
             text-align: center;
             color: #333;
         }
-        canvas {
-            max-width: 100%;
-            height: auto; /* Maintain aspect ratio */
-        }
+        /* Ensure canvas tries to fill the constrained wrapper, Chart.js handles the actual rendering size */
+        /* canvas { */
+            /* max-width: 100%; */ /* This is fine */
+            /* max-height: 100%; */ /* Explicitly allow canvas to use full height of wrapper if Chart.js desires */
+        /* } */
     </style>
 </head>
 <body>
@@ -147,16 +150,21 @@
 
     <div class="container report-container">
         <h2>Weekly Report</h2>
+        <div class="report-controls setting" style="justify-content: flex-start; gap: 15px; margin-bottom: 20px;">
+            <label for="reportDays" style="flex-basis: auto; margin-bottom: 0;">Report Days:</label>
+            <input type="number" id="reportDays" value="7" min="1" max="7" style="width: 70px; flex-basis: auto; padding: 8px;">
+            <button id="refreshReportButton" style="width: auto; padding: 8px 15px; background-color: #007bff; font-size: 0.9em; margin-top:0;">Refresh Report</button>
+        </div>
+        <div id="reportStatus" style="text-align: center; min-height: 1.2em; margin-bottom:10px;"></div>
+
         <div class="chart-wrapper">
-            <p class="chart-title">Daily Focus vs. Timeouts (Last 7 Days)</p>
+            <p class="chart-title">Daily Focus vs. Timeouts</p> <!-- Title updated to be less specific about days -->
             <canvas id="focusTimeoutsChart"></canvas>
         </div>
         <div class="chart-wrapper" style="margin-top: 30px;">
-            <p class="chart-title">Pomodoro Cycles Completed (Last 7 Days)</p>
+            <p class="chart-title">Pomodoro Cycles Completed</p> <!-- Title updated -->
             <canvas id="cyclesChart"></canvas>
         </div>
-        <div id="reportStatus" style="margin-top: 15px; text-align: center; min-height: 1.2em;"></div>
-        <button id="refreshReportButton" style="margin-top: 20px; width: auto; padding: 10px 20px; background-color: #6c757d;">Refresh Report</button>
     </div>
 
     <script src="lib/chart.min.js"></script> <!-- Include Chart.js library -->
