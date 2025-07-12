@@ -22,16 +22,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const DEFAULTS = {
         startTime: "09:00",
         endTime: "17:00",
-        userSetWorkDuration: 25 * 60,
-        shortBreakDuration: 5 * 60,
-        longBreakDuration: 15 * 60,
+        userSetWorkDuration: 25 * 60, 
+        shortBreakDuration: 5 * 60,  
+        longBreakDuration: 15 * 60, 
         pomodorosUntilLongBreak: 4
     };
 
     function loadSettings() {
         chrome.storage.local.get([
-            'startTime', 'endTime',
-            'userSetWorkDuration', 'shortBreakDuration', 'longBreakDuration',
+            'startTime', 'endTime', 
+            'userSetWorkDuration', 'shortBreakDuration', 'longBreakDuration', 
             'pomodorosUntilLongBreak'
         ], (data) => {
             startTimeInput.value = data.startTime || DEFAULTS.startTime;
@@ -40,12 +40,12 @@ document.addEventListener('DOMContentLoaded', () => {
             shortBreakDurationInput.value = data.shortBreakDuration ? (data.shortBreakDuration / 60) : (DEFAULTS.shortBreakDuration / 60);
             longBreakDurationInput.value = data.longBreakDuration ? (data.longBreakDuration / 60) : (DEFAULTS.longBreakDuration / 60);
             pomodorosUntilLongBreakInput.value = data.pomodorosUntilLongBreak || DEFAULTS.pomodorosUntilLongBreak;
-            // console.log('Settings loaded:', data); // Keep for debugging if needed
+            console.log('Settings loaded:', data);
         });
     }
 
     saveButton.addEventListener('click', () => {
-        statusDiv.textContent = '';
+        statusDiv.textContent = ''; 
         statusDiv.className = '';
 
         const startTime = startTimeInput.value;
@@ -83,12 +83,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.error('Error saving settings:', chrome.runtime.lastError);
             } else {
                 displayStatus("Settings saved successfully!", false);
-                // console.log('Settings saved:', settingsToSave);
+                console.log('Settings saved:', settingsToSave);
                 chrome.runtime.sendMessage({ type: 'SETTINGS_UPDATED' }, response => {
                     if (chrome.runtime.lastError) {
-                        // console.warn("Could not send SETTINGS_UPDATED to background.", chrome.runtime.lastError.message);
+                        console.warn("Could not send SETTINGS_UPDATED to background.", chrome.runtime.lastError.message);
                     } else {
-                        // console.log("Background script acknowledged settings update.", response);
+                        console.log("Background script acknowledged settings update.", response);
                     }
                 });
             }
@@ -109,7 +109,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Reporting Logic ---
     async function generateReportData() {
         if (!reportStatusDiv || !reportDaysInput) {
-            // console.warn("Report elements not found on page.");
+            console.warn("Report elements not found on page.");
             return;
         }
         reportStatusDiv.textContent = 'Loading report data...';
@@ -134,21 +134,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 reportStatusDiv.textContent = `Not enough data for the selected period (${daysToReport} day(s)).`;
                 return;
             }
-
+            
             const reportData = {
-                labels: [],
+                labels: [], 
                 netProductiveFocusDurationsHours: [],
                 totalDistractionSiteTimeHours: [],
                 timeoutDurationsHours: [],
                 pomodoroCycles: [],
-                maxYAxisValue: 0
+                maxYAxisValue: 0 
             };
 
             const dayFormatter = new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
             let maxOverallDailyWorkRelatedHours = 0;
 
             lastNLogDays.forEach(dateStr => {
-                const dateObj = new Date(dateStr + 'T00:00:00');
+                const dateObj = new Date(dateStr + 'T00:00:00'); 
                 reportData.labels.push(dayFormatter.format(dateObj));
 
                 let dailyTotalWorkSessionSeconds = 0;
@@ -160,7 +160,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (log.type === 'WORK') {
                         dailyTotalWorkSessionSeconds += (log.actualDuration || 0);
                         dailyTotalTimeoutSeconds += (log.totalAdHocTimeoutDuration || 0);
-                        dailyCycles++;
+                        dailyCycles++; 
                         if (log.distractions) {
                             Object.values(log.distractions).forEach(siteTime => {
                                 dailyTotalDistractionSiteSeconds += (siteTime || 0);
@@ -176,19 +176,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (currentDayTotalBarHeightSeconds / 3600 > maxOverallDailyWorkRelatedHours) {
                     maxOverallDailyWorkRelatedHours = currentDayTotalBarHeightSeconds / 3600;
                 }
-
-                reportData.netProductiveFocusDurationsHours.push(dailyNetProductiveFocusSeconds / 3600);
+                
+                reportData.netProductiveFocusDurationsHours.push(dailyNetProductiveFocusSeconds / 3600); 
                 reportData.totalDistractionSiteTimeHours.push(effectiveDistractionSeconds / 3600);
-                reportData.timeoutDurationsHours.push(dailyTotalTimeoutSeconds / 3600);
+                reportData.timeoutDurationsHours.push(dailyTotalTimeoutSeconds / 3600); 
                 reportData.pomodoroCycles.push(dailyCycles);
             });
-
+            
             reportData.maxYAxisValue = Math.ceil(maxOverallDailyWorkRelatedHours) + 1;
             if (maxOverallDailyWorkRelatedHours === 0 && reportData.labels.length > 0) reportData.maxYAxisValue = 2;
             else if (maxOverallDailyWorkRelatedHours === 0 && reportData.labels.length === 0) reportData.maxYAxisValue = 0;
 
             renderFocusTimeoutsChart(reportData);
-            renderCyclesChart(reportData);
+            renderCyclesChart(reportData); 
             reportStatusDiv.textContent = `Report generated for ${lastNLogDays.length} day(s).`;
 
         } catch (error) {
@@ -201,22 +201,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderFocusTimeoutsChart(data) {
         if (!focusTimeoutsChartCtx) return;
-        // Destruction of old instance is handled at the start of generateReportData
+        // Destruction of old instance is now handled at the start of generateReportData
         focusTimeoutsChartInstance = new Chart(focusTimeoutsChartCtx, {
             type: 'bar',
             data: {
-                labels: data.labels,
+                labels: data.labels, 
                 datasets: [
                     {
-                        label: 'Net Productive Focus (hours)',
-                        data: data.netProductiveFocusDurationsHours,
+                        label: 'Net Productive Focus (hours)', 
+                        data: data.netProductiveFocusDurationsHours, 
                         backgroundColor: 'rgba(75, 192, 192, 0.7)', // Teal
                         borderColor: 'rgba(75, 192, 192, 1)',
                         borderWidth: 1
                     },
                     {
-                        label: 'Distracting Sites (hours)',
-                        data: data.totalDistractionSiteTimeHours,
+                        label: 'Distracting Sites (hours)', 
+                        data: data.totalDistractionSiteTimeHours, 
                         backgroundColor: 'rgba(255, 99, 132, 0.7)', // Red
                         borderColor: 'rgba(255, 99, 132, 1)',
                         borderWidth: 1
@@ -235,14 +235,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 maintainAspectRatio: false,
                 scales: {
                     y: {
-                        stacked: true,
+                        stacked: true, 
                         beginAtZero: true,
                         title: { display: true, text: 'Hours' },
                         suggestedMax: data.maxYAxisValue,
                         ticks: { stepSize: 1 }
                     },
                     x: {
-                        stacked: true,
+                        stacked: true, 
                         title: { display: true, text: 'Date' }
                     }
                 },
@@ -266,11 +266,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderCyclesChart(data) {
         if (!cyclesChartCtx) return;
-        // Destruction of old instance is handled at the start of generateReportData
+        // Destruction of old instance is now handled at the start of generateReportData
         cyclesChartInstance = new Chart(cyclesChartCtx, {
             type: 'bar',
             data: {
-                labels: data.labels,
+                labels: data.labels, 
                 datasets: [{
                     label: 'Pomodoro Cycles Completed',
                     data: data.pomodoroCycles,
