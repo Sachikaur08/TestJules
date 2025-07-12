@@ -10,17 +10,12 @@ document.addEventListener('DOMContentLoaded', function () {
   const resetButton = document.getElementById('reset-button');
   const adhocTimeoutTimerDisplay = document.getElementById('adhoc-timeout-timer-display');
   const sessionSummaryDisplay = document.getElementById('session-summary');
+  const snoozeButton = document.getElementById('snooze-button');
 
   // --- Local State for UI updates ---
   let localMainTimerInterval = null;
   let localAdhocTimeoutInterval = null;
-  let currentLocalAdhocTimeoutTime = 0;
-
-  const DEFAULTS = { // Fallback defaults for UI if settings not in state from background
-      userSetWorkDuration: 25 * 60,
-      shortBreakDuration: 5 * 60,
-      longBreakDuration: 15 * 60
-  };
+  let currentLocalAdhocTimeoutTime = 0; // To display ad-hoc timeout time smoothly
 
   // --- Utility Functions ---
   function formatTime(totalSeconds) {
@@ -39,30 +34,34 @@ document.addEventListener('DOMContentLoaded', function () {
 
   // --- UI Update Logic based on State from Background ---
   function updateUI(state) {
-    // console.log("Popup received state for UI update:", state);
+    console.log("Popup received state for UI update:", state);
 
+    // Update displays
     updateMainTimerDisplay(state.currentTime);
     statusMessage.textContent = getStatusMessage(state);
-    
-    const workDurationForDisplay = state.settings?.userSetWorkDuration || DEFAULTS.userSetWorkDuration;
-    workDurationInput.value = workDurationForDisplay / 60;
+    // Ensure state.settings and state.settings.userSetWorkDuration exist before accessing
+    // Also provide a fallback to a local default if settings are completely missing from state for some reason.
+    const defaultDisplayWorkDuration = 25; // Default if no settings info at all
+    workDurationInput.value = state.settings?.userSetWorkDuration ? state.settings.userSetWorkDuration / 60 : defaultDisplayWorkDuration;
 
-    mainActionButton.className = 'main-action-button'; 
-    mainActionButton.disabled = false;
-    resetButton.disabled = false;
-    setDurationButton.disabled = false;
-    adhocTimeoutTimerDisplay.style.display = 'none';
-    if (localAdhocTimeoutInterval) { clearInterval(localAdhocTimeoutInterval); localAdhocTimeoutInterval = null; }
+
+    // Main Action Button: Text, Class, Disabled status
+    mainActionButton.className = 'main-action-button'; // Reset classes
 
     if (state.isOutsideActiveHours) {
         mainActionButton.textContent = 'Outside Schedule';
         mainActionButton.classList.add('disabled');
         mainActionButton.disabled = true;
+        // statusMessage.textContent is already set by getStatusMessage
+        adhocTimeoutTimerDisplay.style.display = 'none';
+        if (localAdhocTimeoutInterval) clearInterval(localAdhocTimeoutInterval);
+        localAdhocTimeoutInterval = null;
         setDurationButton.disabled = true; 
         resetButton.disabled = true; 
     } else if (state.isAdHocTimeoutActive) { 
       mainActionButton.textContent = 'Finish Timeout'; 
       mainActionButton.classList.add('finish-timeout'); 
+      mainActionButton.disabled = false;
       adhocTimeoutTimerDisplay.style.display = 'block';
       if (!localAdhocTimeoutInterval) { 
         currentLocalAdhocTimeoutTime = state.currentAdHocTimeoutTime || 0; 
@@ -77,16 +76,21 @@ document.addEventListener('DOMContentLoaded', function () {
     } else if (state.currentSessionType === 'WORK' && !state.isPaused) {
       mainActionButton.textContent = 'Take a Timeout'; 
       mainActionButton.classList.add('take-timeout'); 
+      mainActionButton.disabled = false;
+      adhocTimeoutTimerDisplay.style.display = 'none';
+      if (localAdhocTimeoutInterval) clearInterval(localAdhocTimeoutInterval);
+      localAdhocTimeoutInterval = null;
       setDurationButton.disabled = true; 
+      resetButton.disabled = false;
     } else if (state.isPaused) { 
-      const currentPlannedDurationForState = 
-          state.currentSessionType === 'WORK' ? (state.settings?.userSetWorkDuration || DEFAULTS.userSetWorkDuration) :
-          state.currentSessionType === 'SHORT_BREAK' ? (state.settings?.shortBreakDuration || DEFAULTS.shortBreakDuration) :
-          state.currentSessionType === 'LONG_BREAK' ? (state.settings?.longBreakDuration || DEFAULTS.longBreakDuration) :
-          (state.settings?.userSetWorkDuration || DEFAULTS.userSetWorkDuration);
+      // Determine appropriate text for "Start/Resume" based on session type
+      const currentPlannedDuration = state.currentSessionType === 'WORK' ? state.settings?.userSetWorkDuration :
+                                   state.currentSessionType === 'SHORT_BREAK' ? state.settings?.shortBreakDuration :
+                                   state.currentSessionType === 'LONG_BREAK' ? state.settings?.longBreakDuration :
+                                   state.settings?.userSetWorkDuration; // Fallback for safety
 
       if (state.currentSessionType === 'WORK') {
-        mainActionButton.textContent = (state.currentTime === currentPlannedDurationForState) ? 'Start Focus' : 'Resume Focus';
+        mainActionButton.textContent = (state.currentTime === currentPlannedDuration) ? 'Start Focus' : 'Resume Focus';
       } else if (state.currentSessionType === 'SHORT_BREAK') {
         mainActionButton.textContent = 'Start Short Break';
       } else if (state.currentSessionType === 'LONG_BREAK') {
@@ -95,15 +99,24 @@ document.addEventListener('DOMContentLoaded', function () {
          mainActionButton.textContent = 'Start'; 
       }
       mainActionButton.classList.add('start');
-      setDurationButton.disabled = !(state.currentSessionType === 'WORK' && state.currentTime === currentPlannedDurationForState);
-    } else { 
+      mainActionButton.disabled = false;
+      adhocTimeoutTimerDisplay.style.display = 'none';
+      if (localAdhocTimeoutInterval) clearInterval(localAdhocTimeoutInterval);
+      localAdhocTimeoutInterval = null;
+      setDurationButton.disabled = !(state.currentSessionType === 'WORK' && state.currentTime === currentPlannedDuration);
+      resetButton.disabled = false;
+    } else { // Default for non-WORK sessions that are running (e.g. Pomodoro breaks)
       mainActionButton.textContent = 'Break in Progress';
       mainActionButton.classList.add('disabled'); 
       mainActionButton.disabled = true; 
+      adhocTimeoutTimerDisplay.style.display = 'none';
+      if (localAdhocTimeoutInterval) clearInterval(localAdhocTimeoutInterval);
+      localAdhocTimeoutInterval = null;
       setDurationButton.disabled = true;
+      resetButton.disabled = false; 
     }
     
-    if (localMainTimerInterval) { clearInterval(localMainTimerInterval); localMainTimerInterval = null; }
+    if (localMainTimerInterval) clearInterval(localMainTimerInterval);
     if (!state.isPaused && !state.isAdHocTimeoutActive && !state.isOutsideActiveHours) { 
       let displayTime = state.currentTime; 
       updateMainTimerDisplay(displayTime); 
@@ -121,8 +134,15 @@ document.addEventListener('DOMContentLoaded', function () {
     if (state.showSessionSummary) {
         sessionSummaryDisplay.textContent = state.sessionSummaryText;
         sessionSummaryDisplay.style.display = 'block';
+        // Show snooze button only if last session was WORK
+        if (state.currentSessionType === 'SHORT_BREAK' || state.currentSessionType === 'LONG_BREAK') {
+          snoozeButton.style.display = 'block';
+        } else {
+          snoozeButton.style.display = 'none';
+        }
     } else {
         sessionSummaryDisplay.style.display = 'none';
+        snoozeButton.style.display = 'none';
     }
   }
 
@@ -132,21 +152,20 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     if (state.isAdHocTimeoutActive) return "Timeout Active";
     
-    const currentPlannedDurationForState = 
-        state.currentSessionType === 'WORK' ? (state.settings?.userSetWorkDuration || DEFAULTS.userSetWorkDuration) :
-        state.currentSessionType === 'SHORT_BREAK' ? (state.settings?.shortBreakDuration || DEFAULTS.shortBreakDuration) :
-        state.currentSessionType === 'LONG_BREAK' ? (state.settings?.longBreakDuration || DEFAULTS.longBreakDuration) :
-        (state.settings?.userSetWorkDuration || DEFAULTS.userSetWorkDuration);
+    const currentPlannedDuration = state.currentSessionType === 'WORK' ? state.settings?.userSetWorkDuration :
+                                   state.currentSessionType === 'SHORT_BREAK' ? state.settings?.shortBreakDuration :
+                                   state.currentSessionType === 'LONG_BREAK' ? state.settings?.longBreakDuration :
+                                   state.settings?.userSetWorkDuration; // Fallback
 
     switch (state.currentSessionType) {
       case 'WORK':
-        if (state.isPaused && state.currentTime === currentPlannedDurationForState) return "Ready to Focus";
+        if (state.isPaused && state.currentTime === currentPlannedDuration) return "Ready to Focus";
         return state.isPaused ? "Focus Paused" : "Focus Session";
       case 'SHORT_BREAK':
-        if (state.isPaused && state.currentTime === currentPlannedDurationForState) return "Ready for Short Break";
+        if (state.isPaused && state.currentTime === currentPlannedDuration) return "Ready for Short Break";
         return state.isPaused ? "Short Break Paused" : "Short Break";
       case 'LONG_BREAK':
-        if (state.isPaused && state.currentTime === currentPlannedDurationForState) return "Ready for Long Break";
+        if (state.isPaused && state.currentTime === currentPlannedDuration) return "Ready for Long Break";
         return state.isPaused ? "Long Break Paused" : "Long Break";
       default:
         return "Ready"; 
@@ -169,6 +188,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
   resetButton.addEventListener('click', () => {
     chrome.runtime.sendMessage({ type: 'RESET_CYCLE' });
+  });
+
+  snoozeButton.addEventListener('click', () => {
+    chrome.runtime.sendMessage({ type: 'REQUEST_SNOOZE' });
   });
 
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
