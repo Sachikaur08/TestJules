@@ -4,8 +4,6 @@ document.addEventListener('DOMContentLoaded', function () {
   // --- UI Elements ---
   const timerDisplay = document.getElementById('timer-display');
   const statusMessage = document.getElementById('status-message');
-  const workDurationInput = document.getElementById('work-duration');
-  const setDurationButton = document.getElementById('set-duration-button');
   const mainActionButton = document.getElementById('main-action-button');
   const resetButton = document.getElementById('reset-button');
   const adhocTimeoutTimerDisplay = document.getElementById('adhoc-timeout-timer-display');
@@ -42,7 +40,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // Ensure state.settings and state.settings.userSetWorkDuration exist before accessing
     // Also provide a fallback to a local default if settings are completely missing from state for some reason.
     const defaultDisplayWorkDuration = 25; // Default if no settings info at all
-    workDurationInput.value = state.settings?.userSetWorkDuration ? state.settings.userSetWorkDuration / 60 : defaultDisplayWorkDuration;
+    // workDurationInput.value = state.settings?.userSetWorkDuration ? state.settings.userSetWorkDuration / 60 : defaultDisplayWorkDuration;
 
 
     // Main Action Button: Text, Class, Disabled status
@@ -56,7 +54,7 @@ document.addEventListener('DOMContentLoaded', function () {
         adhocTimeoutTimerDisplay.style.display = 'none';
         if (localAdhocTimeoutInterval) clearInterval(localAdhocTimeoutInterval);
         localAdhocTimeoutInterval = null;
-        setDurationButton.disabled = true; 
+        // setDurationButton.disabled = true; 
         resetButton.disabled = true; 
     } else if (state.isAdHocTimeoutActive) { 
       mainActionButton.textContent = 'Finish Timeout'; 
@@ -71,7 +69,7 @@ document.addEventListener('DOMContentLoaded', function () {
           updateAdhocTimeoutTimerDisplay(currentLocalAdhocTimeoutTime);
         }, 1000);
       }
-      setDurationButton.disabled = true; 
+      // setDurationButton.disabled = true; 
       resetButton.disabled = true; 
     } else if (state.currentSessionType === 'WORK' && !state.isPaused) {
       mainActionButton.textContent = 'Take a Timeout'; 
@@ -80,7 +78,7 @@ document.addEventListener('DOMContentLoaded', function () {
       adhocTimeoutTimerDisplay.style.display = 'none';
       if (localAdhocTimeoutInterval) clearInterval(localAdhocTimeoutInterval);
       localAdhocTimeoutInterval = null;
-      setDurationButton.disabled = true; 
+      // setDurationButton.disabled = true; 
       resetButton.disabled = false;
     } else if (state.isPaused) { 
       // Determine appropriate text for "Start/Resume" based on session type
@@ -103,7 +101,7 @@ document.addEventListener('DOMContentLoaded', function () {
       adhocTimeoutTimerDisplay.style.display = 'none';
       if (localAdhocTimeoutInterval) clearInterval(localAdhocTimeoutInterval);
       localAdhocTimeoutInterval = null;
-      setDurationButton.disabled = !(state.currentSessionType === 'WORK' && state.currentTime === currentPlannedDuration);
+      // setDurationButton.disabled = !(state.currentSessionType === 'WORK' && state.currentTime === currentPlannedDuration);
       resetButton.disabled = false;
     } else { // Default for non-WORK sessions that are running (e.g. Pomodoro breaks)
       mainActionButton.textContent = 'Break in Progress';
@@ -112,7 +110,7 @@ document.addEventListener('DOMContentLoaded', function () {
       adhocTimeoutTimerDisplay.style.display = 'none';
       if (localAdhocTimeoutInterval) clearInterval(localAdhocTimeoutInterval);
       localAdhocTimeoutInterval = null;
-      setDurationButton.disabled = true;
+      // setDurationButton.disabled = true;
       resetButton.disabled = false; 
     }
     
@@ -172,15 +170,15 @@ document.addEventListener('DOMContentLoaded', function () {
     }
   }
 
-  setDurationButton.addEventListener('click', () => {
-    const newDurationMinutes = parseInt(workDurationInput.value, 10);
-    if (newDurationMinutes > 0) {
-      chrome.runtime.sendMessage({
-        type: 'UPDATE_WORK_DURATION', 
-        userSetWorkDuration: newDurationMinutes * 60,
-      });
-    }
-  });
+  // setDurationButton.addEventListener('click', () => {
+  //   const newDurationMinutes = parseInt(workDurationInput.value, 10);
+  //   if (newDurationMinutes > 0) {
+  //     chrome.runtime.sendMessage({
+  //       type: 'UPDATE_WORK_DURATION', 
+  //       userSetWorkDuration: newDurationMinutes * 60,
+  //     });
+  //   }
+  // });
 
   mainActionButton.addEventListener('click', () => {
     chrome.runtime.sendMessage({ type: 'MAIN_ACTION_CLICK' });
@@ -209,7 +207,7 @@ document.addEventListener('DOMContentLoaded', function () {
         statusMessage.textContent = "Cannot load";
         mainActionButton.disabled = true;
         resetButton.disabled = true;
-        setDurationButton.disabled = true;
+        // setDurationButton.disabled = true;
         return;
       }
       if (response) {
