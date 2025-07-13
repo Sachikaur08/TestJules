@@ -210,23 +210,23 @@ document.addEventListener('DOMContentLoaded', () => {
                     {
                         label: 'Net Productive Focus (hours)', 
                         data: data.netProductiveFocusDurationsHours, 
-                        backgroundColor: 'rgba(75, 192, 192, 0.7)', // Teal
-                        borderColor: 'rgba(75, 192, 192, 1)',
-                        borderWidth: 1
+                        backgroundColor: 'rgba(39, 174, 96, 0.8)', // Calming green
+                        borderColor: 'rgba(39, 174, 96, 1)',
+                        borderWidth: 2
                     },
                     {
                         label: 'Distracting Sites (hours)', 
                         data: data.totalDistractionSiteTimeHours, 
-                        backgroundColor: 'rgba(255, 99, 132, 0.7)', // Red
-                        borderColor: 'rgba(255, 99, 132, 1)',
-                        borderWidth: 1
+                        backgroundColor: 'rgba(155, 89, 182, 0.8)', // Muted purple instead of red
+                        borderColor: 'rgba(155, 89, 182, 1)',
+                        borderWidth: 2
                     },
                     {
                         label: 'Timeout Time (hours)',
                         data: data.timeoutDurationsHours,
-                        backgroundColor: 'rgba(255, 206, 86, 0.7)', // Yellow
-                        borderColor: 'rgba(255, 206, 86, 1)',
-                        borderWidth: 1
+                        backgroundColor: 'rgba(243, 156, 18, 0.8)', // Warm orange
+                        borderColor: 'rgba(243, 156, 18, 1)',
+                        borderWidth: 2
                     }
                 ]
             },
@@ -237,17 +237,55 @@ document.addEventListener('DOMContentLoaded', () => {
                     y: {
                         stacked: true, 
                         beginAtZero: true,
-                        title: { display: true, text: 'Hours' },
+                        title: { 
+                            display: true, 
+                            text: 'Hours',
+                            font: { size: 14, weight: 'bold' },
+                            color: '#2c3e50'
+                        },
                         suggestedMax: data.maxYAxisValue,
-                        ticks: { stepSize: 1 }
+                        ticks: { 
+                            stepSize: 1,
+                            font: { size: 12 },
+                            color: '#34495e'
+                        },
+                        grid: {
+                            color: 'rgba(189, 195, 199, 0.3)'
+                        }
                     },
                     x: {
                         stacked: true, 
-                        title: { display: true, text: 'Date' }
+                        title: { 
+                            display: true, 
+                            text: 'Date',
+                            font: { size: 14, weight: 'bold' },
+                            color: '#2c3e50'
+                        },
+                        ticks: {
+                            font: { size: 12 },
+                            color: '#34495e'
+                        },
+                        grid: {
+                            color: 'rgba(189, 195, 199, 0.3)'
+                        }
                     }
                 },
                 plugins: {
+                    legend: {
+                        labels: {
+                            font: { size: 13, weight: '600' },
+                            color: '#2c3e50',
+                            usePointStyle: true,
+                            padding: 15
+                        }
+                    },
                     tooltip: {
+                        backgroundColor: 'rgba(44, 62, 80, 0.95)',
+                        titleColor: '#ffffff',
+                        bodyColor: '#ffffff',
+                        borderColor: '#3498db',
+                        borderWidth: 2,
+                        cornerRadius: 8,
                         callbacks: {
                             label: function(context) {
                                 let label = context.dataset.label || '';
@@ -274,9 +312,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 datasets: [{
                     label: 'Focus Cycles Completed',
                     data: data.pomodoroCycles,
-                    backgroundColor: 'rgba(54, 162, 235, 0.7)',
-                    borderColor: 'rgba(54, 162, 235, 1)',
-                    borderWidth: 1
+                    backgroundColor: 'rgba(52, 152, 219, 0.8)', // Calming blue
+                    borderColor: 'rgba(52, 152, 219, 1)',
+                    borderWidth: 2
                 }]
             },
             options: {
@@ -285,11 +323,53 @@ document.addEventListener('DOMContentLoaded', () => {
                 scales: {
                     y: {
                         beginAtZero: true,
-                        title: { display: true, text: 'Number of Cycles' },
-                        ticks: { stepSize: 1 }
+                        title: { 
+                            display: true, 
+                            text: 'Number of Cycles',
+                            font: { size: 14, weight: 'bold' },
+                            color: '#2c3e50'
+                        },
+                        ticks: { 
+                            stepSize: 1,
+                            font: { size: 12 },
+                            color: '#34495e'
+                        },
+                        grid: {
+                            color: 'rgba(189, 195, 199, 0.3)'
+                        }
                     },
                      x: {
-                        title: { display: true, text: 'Date' }
+                        title: { 
+                            display: true, 
+                            text: 'Date',
+                            font: { size: 14, weight: 'bold' },
+                            color: '#2c3e50'
+                        },
+                        ticks: {
+                            font: { size: 12 },
+                            color: '#34495e'
+                        },
+                        grid: {
+                            color: 'rgba(189, 195, 199, 0.3)'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        labels: {
+                            font: { size: 13, weight: '600' },
+                            color: '#2c3e50',
+                            usePointStyle: true,
+                            padding: 15
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(44, 62, 80, 0.95)',
+                        titleColor: '#ffffff',
+                        bodyColor: '#ffffff',
+                        borderColor: '#3498db',
+                        borderWidth: 2,
+                        cornerRadius: 8
                     }
                 }
             }
