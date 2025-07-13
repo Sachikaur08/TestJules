@@ -557,14 +557,26 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         case 'REQUEST_SNOOZE':
             // Only allow snooze if last session was WORK and just ended (i.e., before break starts)
             if ((timerState.currentSessionType === 'SHORT_BREAK' || timerState.currentSessionType === 'LONG_BREAK') && timerState.showSessionSummary) {
-                // Go back to WORK session, add 10 minutes
+                // Go back to WORK session, add 10 minutes and automatically start
                 timerState.currentSessionType = 'WORK';
                 timerState.currentTime = 10 * 60; // 10 minutes
-                timerState.isPaused = true;
+                timerState.isPaused = false; // Automatically start the timer
                 timerState.showSessionSummary = false;
                 timerState.sessionSummaryText = '';
                 timerState.currentWorkSessionSnoozeCount = (timerState.currentWorkSessionSnoozeCount || 0) + 1;
                 timerState.currentWorkSessionTotalSnoozeSeconds = (timerState.currentWorkSessionTotalSnoozeSeconds || 0) + 600;
+                
+                // Initialize the snooze session
+                timerState.currentSessionActualStartTime = Date.now();
+                timerState.currentWorkSessionDistractions = {};
+                timerState.adHocTimeoutCountThisSession = 0;
+                timerState.totalAdHocTimeoutDurationThisSession = 0;
+                
+                // Start the timer alarm and distraction tracking
+                startMainTimerAlarm();
+                handleTabActivity();
+                
+                showNotification("Snooze activated! Focus session started with 10 additional minutes.");
                 broadcastState();
             }
             sendResponse({status: "Snooze processed"});
