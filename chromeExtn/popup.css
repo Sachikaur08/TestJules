@@ -139,3 +139,29 @@ body {
   line-height: 1.4;
   border: 1px solid #ced4da;
 }
+
+#snooze-button {
+  background-color: #ff6b35;
+  color: white;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
+  width: 100%;
+  margin-top: 15px;
+}
+
+#snooze-button:hover {
+  background-color: #e55a2b;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+#snooze-button:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
