@@ -53,14 +53,14 @@ h2 {
 }
 
 .main-action-button.start {
-  background-color: #27ae60;
+  background-color: #6fcf97;
   color: white;
 }
 
 .main-action-button.start:hover {
-  background-color: #229954;
+  background-color: #56b67c;
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(39, 174, 96, 0.3);
+  box-shadow: 0 4px 12px rgba(111, 207, 151, 0.25);
 }
 
 .main-action-button.take-timeout {
