@@ -26,11 +26,7 @@
   },
   "web_accessible_resources": [{
     "resources": ["lib/chart.min.js"],
-    "matches": ["<all_urls>"] 
-    // Or be more specific if options.html is the only place it's used:
-    // "matches": ["chrome-extension://YOUR_EXTENSION_ID/options.html"] 
-    // but you'd need to find your extension ID during development.
-    // For now, "<all_urls>" is fine for local dev, can be tightened later.
+    "matches": ["chrome-extension://*/*"]
   }],
   "icons": {
     "16": "icons/icon16.png",

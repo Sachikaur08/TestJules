@@ -28,8 +28,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let cyclesChartInstance = null;
 
     const DEFAULTS = {
-        startTime: "09:00",
-        endTime: "17:00",
+        startTime: "00:00",
+        endTime: "23:59",
         userSetWorkDuration: 25 * 60, 
         shortBreakDuration: 5 * 60,  
         longBreakDuration: 15 * 60, 
@@ -47,6 +47,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentDistractingSites = [...DEFAULT_DISTRACTING_SITES];
     let sitesChanged = false; // Track if sites have been modified
     let timerSettingsChanged = false; // Track if timer settings have been modified
+
+
 
     function loadSettings() {
         chrome.storage.local.get([
@@ -123,14 +125,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 displayStatus("All settings saved successfully!", false);
                 console.log('Settings saved:', settingsToSave);
                 
-                // Send message to background script
-                chrome.runtime.sendMessage({ type: 'SETTINGS_UPDATED' }, response => {
-                    if (chrome.runtime.lastError) {
-                        console.warn("Could not send SETTINGS_UPDATED to background.", chrome.runtime.lastError.message);
-                    } else {
-                        console.log("Background script acknowledged settings update.", response);
-                    }
-                });
+                // Note: Settings are saved to storage. Background script will reload them on next initialization.
+                console.log("Settings saved to storage. Background script will reload them automatically.");
 
                 // Reset change flags
                 timerSettingsChanged = false;
@@ -225,20 +221,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function saveDistractingSites() {
-        chrome.runtime.sendMessage({
-            type: 'UPDATE_DISTRACTING_SITES',
-            distractingSites: currentDistractingSites
-        }, (response) => {
-            if (chrome.runtime.lastError) {
-                console.error("Error updating distracting sites:", chrome.runtime.lastError);
-                displaySitesStatus("Error saving distracting sites.", true);
-            } else {
-                console.log("Distracting sites updated:", response);
-                sitesChanged = false;
-                updateSaveButtonState();
-                displaySitesStatus("Distracting sites saved successfully!", false);
-            }
-        });
+        // Distracting sites are now saved as part of the main settings save
+        // This function is kept for compatibility but doesn't need to send messages
+        console.log("Distracting sites saved as part of main settings");
+        sitesChanged = false;
+        updateSaveButtonState();
+        displayStatus("Distracting sites saved successfully!", false);
     }
 
     // Event Listeners for Distracting Sites

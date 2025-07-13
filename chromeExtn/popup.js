@@ -181,41 +181,78 @@ document.addEventListener('DOMContentLoaded', function () {
   // });
 
   mainActionButton.addEventListener('click', () => {
-    chrome.runtime.sendMessage({ type: 'MAIN_ACTION_CLICK' });
+    try {
+      chrome.runtime.sendMessage({ type: 'MAIN_ACTION_CLICK' }, (response) => {
+        if (chrome.runtime.lastError) {
+          console.warn("Error sending MAIN_ACTION_CLICK:", chrome.runtime.lastError.message);
+        }
+      });
+    } catch (error) {
+      console.error("Error in main action click:", error);
+    }
   });
 
   resetButton.addEventListener('click', () => {
-    chrome.runtime.sendMessage({ type: 'RESET_CYCLE' });
+    try {
+      chrome.runtime.sendMessage({ type: 'RESET_CYCLE' }, (response) => {
+        if (chrome.runtime.lastError) {
+          console.warn("Error sending RESET_CYCLE:", chrome.runtime.lastError.message);
+        }
+      });
+    } catch (error) {
+      console.error("Error in reset cycle:", error);
+    }
   });
 
   snoozeButton.addEventListener('click', () => {
-    chrome.runtime.sendMessage({ type: 'REQUEST_SNOOZE' });
+    try {
+      chrome.runtime.sendMessage({ type: 'REQUEST_SNOOZE' }, (response) => {
+        if (chrome.runtime.lastError) {
+          console.warn("Error sending REQUEST_SNOOZE:", chrome.runtime.lastError.message);
+        }
+      });
+    } catch (error) {
+      console.error("Error in snooze request:", error);
+    }
   });
 
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.type === 'TIMER_STATE_UPDATE') {
       updateUI(request.state);
+      // No response needed for broadcast messages
+      return false;
     }
-    return true; 
+    return false; 
   });
 
   function requestInitialState() {
-    chrome.runtime.sendMessage({ type: 'GET_TIMER_STATE' }, (response) => {
-      if (chrome.runtime.lastError) {
-        console.error("Error getting initial state:", chrome.runtime.lastError.message);
+    // Add a small delay to ensure background script is ready
+    setTimeout(() => {
+      try {
+        chrome.runtime.sendMessage({ type: 'GET_TIMER_STATE' }, (response) => {
+          if (chrome.runtime.lastError) {
+            console.error("Error getting initial state:", chrome.runtime.lastError.message);
+            timerDisplay.textContent = "Error";
+            statusMessage.textContent = "Cannot load";
+            mainActionButton.disabled = true;
+            resetButton.disabled = true;
+            // setDurationButton.disabled = true;
+            return;
+          }
+          if (response) {
+            updateUI(response);
+          } else {
+            // console.warn("No initial state from background.");
+          }
+        });
+      } catch (error) {
+        console.error("Error in requestInitialState:", error);
         timerDisplay.textContent = "Error";
         statusMessage.textContent = "Cannot load";
         mainActionButton.disabled = true;
         resetButton.disabled = true;
-        // setDurationButton.disabled = true;
-        return;
       }
-      if (response) {
-        updateUI(response);
-      } else {
-        // console.warn("No initial state from background.");
-      }
-    });
+    }, 100);
   }
 
   requestInitialState();

@@ -13,16 +13,13 @@ let settings = {
 const MAIN_TIMER_ALARM_NAME = 'pomodoroMainTimer';
 const DAILY_SCHEDULER_ALARM_NAME = 'dailyActivationScheduler';
 
-// Default distracting sites - will be overridden by storage if available
-const DEFAULT_DISTRACTING_SITES = [
+const DISTRACTING_SITES = [
     'youtube.com', 
     'www.youtube.com',
     'instagram.com',
     'www.instagram.com',
     'web.whatsapp.com' 
 ];
-
-let DISTRACTING_SITES = [...DEFAULT_DISTRACTING_SITES]; // Will be updated from storage
 
 let timerState = {
     currentTime: settings.userSetWorkDuration, 
@@ -58,26 +55,57 @@ let timerState = {
 
 // --- Helper Functions ---
 function showNotification(message) {
-    chrome.notifications.create({
-        type: 'basic', iconUrl: 'icons/icon128.png',
-        title: 'NeuroFocus Timer', message: message, priority: 2
-    });
+    try {
+        chrome.notifications.create({
+            type: 'basic', iconUrl: 'icons/icon128.png',
+            title: 'NeuroFocus Timer', message: message, priority: 2
+        }, (notificationId) => {
+            if (chrome.runtime.lastError) {
+                console.error("Error creating notification:", chrome.runtime.lastError.message);
+            }
+        });
+    } catch (error) {
+        console.error("Error in showNotification:", error);
+    }
 }
 
 function broadcastState() {
-    if (timerState.isAdHocTimeoutActive && timerState.adHocTimeoutStartTime > 0) { 
-        timerState.currentAdHocTimeoutTime = Math.floor((Date.now() - timerState.adHocTimeoutStartTime) / 1000); 
-    }
-    // Include settings in the broadcast so popup can display schedule times
-    const stateWithSettings = { ...timerState, settings: { ...settings } };
-    chrome.runtime.sendMessage({ type: 'TIMER_STATE_UPDATE', state: stateWithSettings });
-    // console.log("State broadcasted:", JSON.parse(JSON.stringify(stateWithSettings))); 
+    // Add a small delay to prevent rapid successive broadcasts
+    setTimeout(() => {
+        try {
+            if (timerState.isAdHocTimeoutActive && timerState.adHocTimeoutStartTime > 0) { 
+                timerState.currentAdHocTimeoutTime = Math.floor((Date.now() - timerState.adHocTimeoutStartTime) / 1000); 
+            }
+            // Include settings in the broadcast so popup can display schedule times
+            const stateWithSettings = { ...timerState, settings: { ...settings } };
+            // Use sendMessage with callback to handle connection errors gracefully
+            chrome.runtime.sendMessage({ type: 'TIMER_STATE_UPDATE', state: stateWithSettings }, (response) => {
+                if (chrome.runtime.lastError) {
+                    // Don't log errors when no popup is open - this is expected
+                    if (!chrome.runtime.lastError.message.includes('Receiving end does not exist')) {
+                        console.warn("Error broadcasting state:", chrome.runtime.lastError.message);
+                    }
+                }
+            });
+            // console.log("State broadcasted:", JSON.parse(JSON.stringify(stateWithSettings))); 
+        } catch (error) {
+            console.error("Error in broadcastState:", error);
+        }
+    }, 10); // Small delay to prevent rapid successive calls
 }
 
 function saveSettingsToStorage(newSettings, callback) {
-    chrome.storage.local.set(newSettings, () => {
+    try {
+        chrome.storage.local.set(newSettings, () => {
+            if (chrome.runtime.lastError) {
+                console.error("Error saving settings to storage:", chrome.runtime.lastError.message);
+            }
+            if (callback) callback();
+        });
+    } catch (error) {
+        console.error("Error in saveSettingsToStorage:", error);
         if (callback) callback();
-    });
+    }
 }
 
 // Loads all settings and then initializes timerState based on them.
@@ -93,9 +121,6 @@ function loadSettingsAndInitializeState(callback) {
     settings.shortBreakDuration = loadedData.shortBreakDuration !== undefined ? loadedData.shortBreakDuration : settings.shortBreakDuration;
     settings.longBreakDuration = loadedData.longBreakDuration !== undefined ? loadedData.longBreakDuration : settings.longBreakDuration;
     settings.pomodorosUntilLongBreak = loadedData.pomodorosUntilLongBreak !== undefined ? loadedData.pomodorosUntilLongBreak : settings.pomodorosUntilLongBreak;
-
-    // Load distracting sites from storage or use defaults
-    DISTRACTING_SITES = loadedData.distractingSites || [...DEFAULT_DISTRACTING_SITES];
 
     timerState.currentTime = settings.userSetWorkDuration;
     timerState.isPaused = true;
@@ -121,6 +146,13 @@ function loadSettingsAndInitializeState(callback) {
     timerState.showSessionSummary = false;
     timerState.sessionSummaryText = "";
     timerState.currentSessionActualStartTime = 0; 
+    
+    // Load distracting sites from storage
+    if (loadedData.distractingSites && Array.isArray(loadedData.distractingSites)) {
+        DISTRACTING_SITES.length = 0;
+        DISTRACTING_SITES.push(...loadedData.distractingSites);
+        console.log("Distracting sites loaded from storage:", DISTRACTING_SITES);
+    }
     
     checkIfOutsideActiveHours(); 
     if (callback) callback();
@@ -165,7 +197,15 @@ function getFormattedDate(timestamp) {
 }
 
 function startMainTimerAlarm() { 
-    chrome.alarms.create(MAIN_TIMER_ALARM_NAME, { delayInMinutes: 0, periodInMinutes: 1 / 60 });
+    try {
+        chrome.alarms.create(MAIN_TIMER_ALARM_NAME, { delayInMinutes: 0, periodInMinutes: 1 / 60 }, (alarm) => {
+            if (chrome.runtime.lastError) {
+                console.error("Error creating main timer alarm:", chrome.runtime.lastError.message);
+            }
+        });
+    } catch (error) {
+        console.error("Error in startMainTimerAlarm:", error);
+    }
 }
 
 function startMainTimer() { 
@@ -173,7 +213,11 @@ function startMainTimer() {
         showNotification(`Timer operational only between ${settings.startTime} and ${settings.endTime}.`);
         if (!timerState.isPaused) { 
             timerState.isPaused = true;
-            chrome.alarms.clear(MAIN_TIMER_ALARM_NAME);
+            chrome.alarms.clear(MAIN_TIMER_ALARM_NAME, (wasCleared) => {
+                if (chrome.runtime.lastError) {
+                    console.error("Error clearing main timer alarm:", chrome.runtime.lastError.message);
+                }
+            });
             stopCurrentDistractionTracking(true);
         }
         broadcastState();
@@ -206,7 +250,11 @@ function startMainTimer() {
 function pauseMainTimer() { // For explicit pause of WORK session
     if (!timerState.isPaused && !timerState.isAdHocTimeoutActive && timerState.currentSessionType === 'WORK') {
         timerState.isPaused = true;
-        chrome.alarms.clear(MAIN_TIMER_ALARM_NAME);
+        chrome.alarms.clear(MAIN_TIMER_ALARM_NAME, (wasCleared) => {
+            if (chrome.runtime.lastError) {
+                console.error("Error clearing main timer alarm during pause:", chrome.runtime.lastError.message);
+            }
+        });
         stopCurrentDistractionTracking(true); 
         console.log(`${timerState.currentSessionType} timer explicitly paused.`);
         broadcastState();
@@ -214,33 +262,45 @@ function pauseMainTimer() { // For explicit pause of WORK session
 }
 
 function resetPomodoroCycle() {
-    chrome.alarms.clear(MAIN_TIMER_ALARM_NAME);
-    timerState.isPaused = true;
-    timerState.currentSessionType = 'WORK';
-    timerState.currentTime = settings.userSetWorkDuration; 
-    timerState.pomodorosCompletedThisCycle = 0;
-    
-    stopCurrentDistractionTracking(false); 
-    timerState.currentWorkSessionDistractions = {};
-    timerState.currentlyTrackedDistractingSite = null;
-    timerState.isAdHocTimeoutActive = false; 
-    timerState.currentAdHocTimeoutTime = 0; 
-    timerState.adHocTimeoutStartTime = 0;    
-    timerState.adHocTimeoutCountThisSession = 0; 
-    timerState.totalAdHocTimeoutDurationThisSession = 0; 
-    
-    // Reset snooze fields to default
-    timerState.pendingChoiceAfterWork = false;
-    timerState.currentWorkSessionInitialStartTime = 0;
-    timerState.currentWorkSessionPlannedDuration = settings.userSetWorkDuration;
-    timerState.currentWorkSessionSnoozeCount = 0;
-    timerState.currentWorkSessionTotalSnoozeSeconds = 0;
+    try {
+        chrome.alarms.clear(MAIN_TIMER_ALARM_NAME, (wasCleared) => {
+            if (chrome.runtime.lastError) {
+                console.error("Error clearing main timer alarm:", chrome.runtime.lastError.message);
+            }
+        });
+        timerState.isPaused = true;
+        timerState.currentSessionType = 'WORK';
+        timerState.currentTime = settings.userSetWorkDuration; 
+        timerState.pomodorosCompletedThisCycle = 0;
+        
+        stopCurrentDistractionTracking(false); 
+        timerState.currentWorkSessionDistractions = {};
+        timerState.currentlyTrackedDistractingSite = null;
+        timerState.isAdHocTimeoutActive = false; 
+        timerState.currentAdHocTimeoutTime = 0; 
+        timerState.adHocTimeoutStartTime = 0;    
+        timerState.adHocTimeoutCountThisSession = 0; 
+        timerState.totalAdHocTimeoutDurationThisSession = 0; 
+        
+        // Reset snooze fields to default
+        timerState.pendingChoiceAfterWork = false;
+        timerState.currentWorkSessionInitialStartTime = 0;
+        timerState.currentWorkSessionPlannedDuration = settings.userSetWorkDuration;
+        timerState.currentWorkSessionSnoozeCount = 0;
+        timerState.currentWorkSessionTotalSnoozeSeconds = 0;
 
-    timerState.showSessionSummary = false;
-    checkIfOutsideActiveHours(); 
-    console.log("Cycle reset.");
-    chrome.storage.local.set({ pomodorosCompletedThisCycle: 0 });
-    broadcastState();
+        timerState.showSessionSummary = false;
+        checkIfOutsideActiveHours(); 
+        console.log("Cycle reset.");
+        chrome.storage.local.set({ pomodorosCompletedThisCycle: 0 }, () => {
+            if (chrome.runtime.lastError) {
+                console.error("Error saving pomodoros completed count:", chrome.runtime.lastError.message);
+            }
+        });
+        broadcastState();
+    } catch (error) {
+        console.error("Error in resetPomodoroCycle:", error);
+    }
 }
 
 function generateSessionSummary() { // Simplified pre-snooze version
@@ -266,7 +326,11 @@ function generateSessionSummary() { // Simplified pre-snooze version
 
 function advanceToNextSession() { // Reverted to pre-snooze logic
   timerState.isPaused = true; 
-  chrome.alarms.clear(MAIN_TIMER_ALARM_NAME);
+  chrome.alarms.clear(MAIN_TIMER_ALARM_NAME, (wasCleared) => {
+      if (chrome.runtime.lastError) {
+          console.error("Error clearing main timer alarm during session advance:", chrome.runtime.lastError.message);
+      }
+  });
   let notificationMessage = "";
   const sessionEndTime = Date.now();
   let plannedDuration;
@@ -288,14 +352,22 @@ function advanceToNextSession() { // Reverted to pre-snooze logic
     });
     generateSessionSummary(); 
     timerState.pomodorosCompletedThisCycle++;
-    chrome.storage.local.set({ pomodorosCompletedThisCycle: timerState.pomodorosCompletedThisCycle });
+    chrome.storage.local.set({ pomodorosCompletedThisCycle: timerState.pomodorosCompletedThisCycle }, () => {
+        if (chrome.runtime.lastError) {
+            console.error("Error saving pomodoros completed count:", chrome.runtime.lastError.message);
+        }
+    });
     notificationMessage = "Focus session complete! Time for a break."; 
     
     if (timerState.pomodorosCompletedThisCycle >= settings.pomodorosUntilLongBreak) { 
       timerState.currentSessionType = 'LONG_BREAK';
       timerState.currentTime = settings.longBreakDuration; 
       timerState.pomodorosCompletedThisCycle = 0; 
-      chrome.storage.local.set({ pomodorosCompletedThisCycle: 0 }); 
+      chrome.storage.local.set({ pomodorosCompletedThisCycle: 0 }, () => {
+          if (chrome.runtime.lastError) {
+              console.error("Error resetting pomodoros completed count:", chrome.runtime.lastError.message);
+          }
+      }); 
     } else {
       timerState.currentSessionType = 'SHORT_BREAK';
       timerState.currentTime = settings.shortBreakDuration; 
@@ -340,7 +412,11 @@ function startAdHocTimeout() {
     }
     if (timerState.currentSessionType === 'WORK' && !timerState.isAdHocTimeoutActive && !timerState.isPaused) { 
         timerState.isPaused = true; 
-        chrome.alarms.clear(MAIN_TIMER_ALARM_NAME); 
+        chrome.alarms.clear(MAIN_TIMER_ALARM_NAME, (wasCleared) => {
+            if (chrome.runtime.lastError) {
+                console.error("Error clearing main timer alarm during ad-hoc timeout:", chrome.runtime.lastError.message);
+            }
+        }); 
         stopCurrentDistractionTracking(true); 
         
         timerState.isAdHocTimeoutActive = true; 
@@ -403,7 +479,11 @@ chrome.alarms.onAlarm.addListener((alarm) => {
             showNotification("Active schedule ended. Timer stopped.");
             timerState.isPaused = true;
             timerState.isOutsideActiveHours = true; 
-            chrome.alarms.clear(MAIN_TIMER_ALARM_NAME);
+            chrome.alarms.clear(MAIN_TIMER_ALARM_NAME, (wasCleared) => {
+                if (chrome.runtime.lastError) {
+                    console.error("Error clearing main timer alarm during schedule end:", chrome.runtime.lastError.message);
+                }
+            });
             stopCurrentDistractionTracking(true);
             
             if (timerState.currentSessionType === 'WORK') { // No pendingChoiceAfterWork check in this reverted version
@@ -471,6 +551,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             } else if (timerState.currentSessionType !== 'WORK' && !timerState.isPaused) { 
                 pauseMainTimer(); 
             }
+            sendResponse({status: "Action processed"});
+            responseSent = true;
             break;
         case 'REQUEST_SNOOZE':
             // Only allow snooze if last session was WORK and just ended (i.e., before break starts)
@@ -485,9 +567,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 timerState.currentWorkSessionTotalSnoozeSeconds = (timerState.currentWorkSessionTotalSnoozeSeconds || 0) + 600;
                 broadcastState();
             }
+            sendResponse({status: "Snooze processed"});
+            responseSent = true;
             break;
         case 'RESET_CYCLE':
             resetPomodoroCycle(); 
+            sendResponse({status: "Cycle reset"});
+            responseSent = true;
             break;
         case 'UPDATE_WORK_DURATION': 
             const newWorkDur = request.userSetWorkDuration;
@@ -498,43 +584,23 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                   timerState.currentTime = newWorkDur;
                 }
                 chrome.storage.local.set({ userSetWorkDuration: newWorkDur }, () => {
-                    broadcastState();
+                    if (chrome.runtime.lastError) {
+                        console.error("Error saving work duration:", chrome.runtime.lastError.message);
+                    } else {
+                        broadcastState();
+                    }
                 });
             }
-            break;
-        case 'SETTINGS_UPDATED': 
-            console.log("Received SETTINGS_UPDATED message from options page.");
-            loadSettingsAndInitializeState(() => {
-                chrome.alarms.clear(MAIN_TIMER_ALARM_NAME); 
-                showNotification("Settings updated. Timer has been reset to apply new durations/schedule.");
-                broadcastState(); 
-            });
-            sendResponse({status: "Settings received and re-initializing."});
+            sendResponse({status: "Work duration updated"});
             responseSent = true;
             break;
-        case 'UPDATE_DISTRACTING_SITES':
-            const newSites = request.distractingSites;
-            if (Array.isArray(newSites) && newSites.length <= 10) {
-                DISTRACTING_SITES = [...newSites];
-                chrome.storage.local.set({ distractingSites: DISTRACTING_SITES }, () => {
-                    console.log("Distracting sites updated:", DISTRACTING_SITES);
-                    broadcastState();
-                });
-                sendResponse({status: "Distracting sites updated successfully."});
-            } else {
-                sendResponse({status: "Error: Invalid sites array or exceeds 10 site limit."});
-            }
-            responseSent = true;
-            break;
-        case 'GET_DISTRACTING_SITES':
-            sendResponse({distractingSites: DISTRACTING_SITES});
-            responseSent = true;
-            break;
+
+
         default:
             console.warn("Unknown message type received:", request.type);
             return false; 
     }
-    return !responseSent; 
+    return responseSent; // Return true only if we sent a response
 });
 
 // --- Distraction Tracking Logic (remains largely the same) ---
@@ -613,17 +679,23 @@ chrome.runtime.onInstalled.addListener((details) => {
             showNotification("NeuroFocus Timer installed! Configure your schedule in Options.");
             saveSettingsToStorage(settings);
         }
-        broadcastState();
+        // Don't broadcast state during initialization - popup will request it when needed
     });
 });
 
 chrome.runtime.onStartup.addListener(() => {
     console.log("Extension lifecycle: onStartup");
     loadSettingsAndInitializeState(() => { 
-        chrome.alarms.clear(MAIN_TIMER_ALARM_NAME); 
-        broadcastState();
+        chrome.alarms.clear(MAIN_TIMER_ALARM_NAME, (wasCleared) => {
+            if (chrome.runtime.lastError) {
+                console.error("Error clearing main timer alarm on startup:", chrome.runtime.lastError.message);
+            }
+        }); 
+        // Don't broadcast state during initialization - popup will request it when needed
     });
 });
 
-loadSettingsAndInitializeState(broadcastState);
+loadSettingsAndInitializeState(() => {
+    console.log("Background script initialized successfully.");
+});
 console.log("Background script loaded (reverted pre-snooze version).");
