@@ -98,7 +98,7 @@ body {
 #main-action-button.finish-timeout:hover {
   background-color: #138496;
 }
-#main-action-button.disabled { /* For when timer is in non-interactive state e.g. pomodoro break */
+#main-action-button.disabled { /* For when timer is in non-interactive state e.g. break */
     background-color: #6c757d; /* Grey */
     cursor: not-allowed;
 }

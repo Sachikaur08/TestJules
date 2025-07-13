@@ -272,7 +272,7 @@ document.addEventListener('DOMContentLoaded', () => {
             data: {
                 labels: data.labels, 
                 datasets: [{
-                    label: 'Pomodoro Cycles Completed',
+                    label: 'Focus Cycles Completed',
                     data: data.pomodoroCycles,
                     backgroundColor: 'rgba(54, 162, 235, 0.7)',
                     borderColor: 'rgba(54, 162, 235, 1)',

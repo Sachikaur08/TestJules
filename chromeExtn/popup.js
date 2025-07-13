@@ -103,7 +103,7 @@ document.addEventListener('DOMContentLoaded', function () {
       localAdhocTimeoutInterval = null;
       // setDurationButton.disabled = !(state.currentSessionType === 'WORK' && state.currentTime === currentPlannedDuration);
       resetButton.disabled = false;
-    } else { // Default for non-WORK sessions that are running (e.g. Pomodoro breaks)
+    } else { // Default for non-WORK sessions that are running (e.g. breaks)
       mainActionButton.textContent = 'Break in Progress';
       mainActionButton.classList.add('disabled'); 
       mainActionButton.disabled = true; 

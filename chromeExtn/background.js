@@ -232,7 +232,7 @@ function resetPomodoroCycle() {
 
     timerState.showSessionSummary = false;
     checkIfOutsideActiveHours(); 
-    console.log("Pomodoro cycle reset.");
+    console.log("Cycle reset.");
     chrome.storage.local.set({ pomodorosCompletedThisCycle: 0 });
     broadcastState();
 }
@@ -283,7 +283,7 @@ function advanceToNextSession() { // Reverted to pre-snooze logic
     generateSessionSummary(); 
     timerState.pomodorosCompletedThisCycle++;
     chrome.storage.local.set({ pomodorosCompletedThisCycle: timerState.pomodorosCompletedThisCycle });
-    notificationMessage = "Focus session complete! Time for a Pomodoro break."; 
+    notificationMessage = "Focus session complete! Time for a break."; 
     
     if (timerState.pomodorosCompletedThisCycle >= settings.pomodorosUntilLongBreak) { 
       timerState.currentSessionType = 'LONG_BREAK';
@@ -317,7 +317,7 @@ function advanceToNextSession() { // Reverted to pre-snooze logic
         broadcastState();
         return;
     }
-    notificationMessage = "Pomodoro break's over! Time to focus."; 
+    notificationMessage = "Break's over! Time to focus."; 
     timerState.currentSessionType = 'WORK';
     timerState.currentTime = settings.userSetWorkDuration; 
     timerState.showSessionSummary = false; 

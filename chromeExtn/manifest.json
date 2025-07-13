@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "NeuroFocusTimer",
   "version": "0.1.0",
-  "description": "A Pomodoro timer to help manage distraction and improve focus.",
+  "description": "A self-configuration based timer to help manage distraction and improve focus.",
   "permissions": [
     "alarms",
     "notifications",
