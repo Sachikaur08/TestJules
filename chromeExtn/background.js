@@ -707,7 +707,36 @@ chrome.runtime.onStartup.addListener(() => {
     });
 });
 
+// --- Context Menu Setup ---
+function createContextMenus() {
+    // Remove existing context menus to avoid duplicates
+    chrome.contextMenus.removeAll(() => {
+        // Create the main context menu item
+        chrome.contextMenus.create({
+            id: "openNeuroFocusTimer",
+            title: "NeuroFocusTimer",
+            contexts: ["page", "selection", "link"]
+        }, () => {
+            if (chrome.runtime.lastError) {
+                console.error("Error creating context menu:", chrome.runtime.lastError.message);
+            } else {
+                console.log("Context menu created successfully");
+            }
+        });
+    });
+}
+
+// Context menu click handler
+chrome.contextMenus.onClicked.addListener((info, tab) => {
+    if (info.menuItemId === "openNeuroFocusTimer") {
+        console.log("Context menu: NeuroFocusTimer clicked");
+        // Open the popup by programmatically clicking the extension icon
+        chrome.action.openPopup();
+    }
+});
+
 loadSettingsAndInitializeState(() => {
     console.log("Background script initialized successfully.");
+    createContextMenus();
 });
 console.log("Background script loaded (reverted pre-snooze version).");
