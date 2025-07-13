@@ -13,13 +13,16 @@ let settings = {
 const MAIN_TIMER_ALARM_NAME = 'pomodoroMainTimer';
 const DAILY_SCHEDULER_ALARM_NAME = 'dailyActivationScheduler';
 
-const DISTRACTING_SITES = [
+// Default distracting sites - will be overridden by storage if available
+const DEFAULT_DISTRACTING_SITES = [
     'youtube.com', 
     'www.youtube.com',
     'instagram.com',
     'www.instagram.com',
     'web.whatsapp.com' 
 ];
+
+let DISTRACTING_SITES = [...DEFAULT_DISTRACTING_SITES]; // Will be updated from storage
 
 let timerState = {
     currentTime: settings.userSetWorkDuration, 
@@ -82,7 +85,7 @@ function loadSettingsAndInitializeState(callback) {
   chrome.storage.local.get([
     'startTime', 'endTime',
     'userSetWorkDuration', 'shortBreakDuration', 'longBreakDuration',
-    'pomodorosUntilLongBreak', 'pomodorosCompletedThisCycle'
+    'pomodorosUntilLongBreak', 'pomodorosCompletedThisCycle', 'distractingSites'
   ], (loadedData) => {
     settings.startTime = loadedData.startTime || settings.startTime;
     settings.endTime = loadedData.endTime || settings.endTime;
@@ -90,6 +93,9 @@ function loadSettingsAndInitializeState(callback) {
     settings.shortBreakDuration = loadedData.shortBreakDuration !== undefined ? loadedData.shortBreakDuration : settings.shortBreakDuration;
     settings.longBreakDuration = loadedData.longBreakDuration !== undefined ? loadedData.longBreakDuration : settings.longBreakDuration;
     settings.pomodorosUntilLongBreak = loadedData.pomodorosUntilLongBreak !== undefined ? loadedData.pomodorosUntilLongBreak : settings.pomodorosUntilLongBreak;
+
+    // Load distracting sites from storage or use defaults
+    DISTRACTING_SITES = loadedData.distractingSites || [...DEFAULT_DISTRACTING_SITES];
 
     timerState.currentTime = settings.userSetWorkDuration;
     timerState.isPaused = true;
@@ -504,6 +510,24 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 broadcastState(); 
             });
             sendResponse({status: "Settings received and re-initializing."});
+            responseSent = true;
+            break;
+        case 'UPDATE_DISTRACTING_SITES':
+            const newSites = request.distractingSites;
+            if (Array.isArray(newSites) && newSites.length <= 10) {
+                DISTRACTING_SITES = [...newSites];
+                chrome.storage.local.set({ distractingSites: DISTRACTING_SITES }, () => {
+                    console.log("Distracting sites updated:", DISTRACTING_SITES);
+                    broadcastState();
+                });
+                sendResponse({status: "Distracting sites updated successfully."});
+            } else {
+                sendResponse({status: "Error: Invalid sites array or exceeds 10 site limit."});
+            }
+            responseSent = true;
+            break;
+        case 'GET_DISTRACTING_SITES':
+            sendResponse({distractingSites: DISTRACTING_SITES});
             responseSent = true;
             break;
         default:

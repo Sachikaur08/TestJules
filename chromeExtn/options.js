@@ -6,8 +6,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const shortBreakDurationInput = document.getElementById('shortBreakDuration');
     const longBreakDurationInput = document.getElementById('longBreakDuration');
     const pomodorosUntilLongBreakInput = document.getElementById('pomodorosUntilLongBreak');
-    const saveButton = document.getElementById('saveButton');
+    const saveAllButton = document.getElementById('saveAllButton');
     const statusDiv = document.getElementById('status');
+
+    // DOM Elements for Distracting Sites Management
+    const newSiteInput = document.getElementById('newSiteInput');
+    const addSiteButton = document.getElementById('addSiteButton');
+    const distractingSitesList = document.getElementById('distractingSitesList');
+    const resetSitesButton = document.getElementById('resetSitesButton');
+    const saveSitesButton = document.getElementById('saveSitesButton');
+    const sitesStatusDiv = document.getElementById('sitesStatus');
 
     // DOM Elements for Reporting
     const focusTimeoutsChartCtx = document.getElementById('focusTimeoutsChart')?.getContext('2d');
@@ -28,11 +36,23 @@ document.addEventListener('DOMContentLoaded', () => {
         pomodorosUntilLongBreak: 4
     };
 
+    const DEFAULT_DISTRACTING_SITES = [
+        'youtube.com', 
+        'www.youtube.com',
+        'instagram.com',
+        'www.instagram.com',
+        'web.whatsapp.com' 
+    ];
+
+    let currentDistractingSites = [...DEFAULT_DISTRACTING_SITES];
+    let sitesChanged = false; // Track if sites have been modified
+    let timerSettingsChanged = false; // Track if timer settings have been modified
+
     function loadSettings() {
         chrome.storage.local.get([
             'startTime', 'endTime', 
             'userSetWorkDuration', 'shortBreakDuration', 'longBreakDuration', 
-            'pomodorosUntilLongBreak'
+            'pomodorosUntilLongBreak', 'distractingSites'
         ], (data) => {
             startTimeInput.value = data.startTime || DEFAULTS.startTime;
             endTimeInput.value = data.endTime || DEFAULTS.endTime;
@@ -40,14 +60,31 @@ document.addEventListener('DOMContentLoaded', () => {
             shortBreakDurationInput.value = data.shortBreakDuration ? (data.shortBreakDuration / 60) : (DEFAULTS.shortBreakDuration / 60);
             longBreakDurationInput.value = data.longBreakDuration ? (data.longBreakDuration / 60) : (DEFAULTS.longBreakDuration / 60);
             pomodorosUntilLongBreakInput.value = data.pomodorosUntilLongBreak || DEFAULTS.pomodorosUntilLongBreak;
+            
+            // Load distracting sites
+            currentDistractingSites = data.distractingSites || [...DEFAULT_DISTRACTING_SITES];
+            renderDistractingSitesList();
+            sitesChanged = false;
+            timerSettingsChanged = false;
+            updateSaveButtonState();
+            
             console.log('Settings loaded:', data);
         });
     }
 
-    saveButton.addEventListener('click', () => {
+    // Add change listeners for timer settings
+    startTimeInput.addEventListener('change', () => { timerSettingsChanged = true; updateSaveButtonState(); });
+    endTimeInput.addEventListener('change', () => { timerSettingsChanged = true; updateSaveButtonState(); });
+    focusDurationInput.addEventListener('change', () => { timerSettingsChanged = true; updateSaveButtonState(); });
+    shortBreakDurationInput.addEventListener('change', () => { timerSettingsChanged = true; updateSaveButtonState(); });
+    longBreakDurationInput.addEventListener('change', () => { timerSettingsChanged = true; updateSaveButtonState(); });
+    pomodorosUntilLongBreakInput.addEventListener('change', () => { timerSettingsChanged = true; updateSaveButtonState(); });
+
+    saveAllButton.addEventListener('click', () => {
         statusDiv.textContent = ''; 
         statusDiv.className = '';
 
+        // Validate timer settings
         const startTime = startTimeInput.value;
         const endTime = endTimeInput.value;
         const focusDuration = parseInt(focusDurationInput.value, 10);
@@ -74,7 +111,8 @@ document.addEventListener('DOMContentLoaded', () => {
             userSetWorkDuration: focusDuration * 60,
             shortBreakDuration: shortBreakDuration * 60,
             longBreakDuration: longBreakDuration * 60,
-            pomodorosUntilLongBreak: pomodorosUntilLongBreak
+            pomodorosUntilLongBreak: pomodorosUntilLongBreak,
+            distractingSites: currentDistractingSites
         };
 
         chrome.storage.local.set(settingsToSave, () => {
@@ -82,8 +120,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 displayStatus(`Error saving settings: ${chrome.runtime.lastError.message}`, true);
                 console.error('Error saving settings:', chrome.runtime.lastError);
             } else {
-                displayStatus("Settings saved successfully!", false);
+                displayStatus("All settings saved successfully!", false);
                 console.log('Settings saved:', settingsToSave);
+                
+                // Send message to background script
                 chrome.runtime.sendMessage({ type: 'SETTINGS_UPDATED' }, response => {
                     if (chrome.runtime.lastError) {
                         console.warn("Could not send SETTINGS_UPDATED to background.", chrome.runtime.lastError.message);
@@ -91,6 +131,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         console.log("Background script acknowledged settings update.", response);
                     }
                 });
+
+                // Reset change flags
+                timerSettingsChanged = false;
+                sitesChanged = false;
+                updateSaveButtonState();
             }
         });
     });
@@ -103,6 +148,119 @@ document.addEventListener('DOMContentLoaded', () => {
             statusDiv.className = '';
         }, 3000);
     }
+
+    // Distracting Sites Management Functions
+    function renderDistractingSitesList() {
+        distractingSitesList.innerHTML = '';
+        currentDistractingSites.forEach((site, index) => {
+            const siteDiv = document.createElement('div');
+            siteDiv.className = 'site-item';
+            siteDiv.innerHTML = `
+                <span class="site-name">${site}</span>
+                <button class="remove-site-btn" data-index="${index}">Remove</button>
+            `;
+            distractingSitesList.appendChild(siteDiv);
+        });
+    }
+
+    function addDistractingSite(site) {
+        const trimmedSite = site.trim().toLowerCase();
+        if (!trimmedSite) {
+            displayStatus("Please enter a valid site name.", true);
+            return false;
+        }
+        
+        if (currentDistractingSites.includes(trimmedSite)) {
+            displayStatus("This site is already in the list.", true);
+            return false;
+        }
+        
+        if (currentDistractingSites.length >= 10) {
+            displayStatus("Maximum 10 distracting sites allowed.", true);
+            return false;
+        }
+        
+        currentDistractingSites.push(trimmedSite);
+        renderDistractingSitesList();
+        sitesChanged = true;
+        updateSaveButtonState();
+        newSiteInput.value = '';
+        displayStatus("Site added to list. Click 'Save All Settings' to apply.", false);
+        return true;
+    }
+
+    function removeDistractingSite(index) {
+        currentDistractingSites.splice(index, 1);
+        renderDistractingSitesList();
+        sitesChanged = true;
+        updateSaveButtonState();
+        displayStatus("Site removed from list. Click 'Save All Settings' to apply.", false);
+    }
+
+    function resetToDefaultSites() {
+        currentDistractingSites = [...DEFAULT_DISTRACTING_SITES];
+        renderDistractingSitesList();
+        sitesChanged = true;
+        updateSaveButtonState();
+        displayStatus("Reset to default sites. Click 'Save All Settings' to apply.", false);
+    }
+
+    function updateSaveButtonState() {
+        const hasChanges = timerSettingsChanged || sitesChanged;
+        saveAllButton.disabled = !hasChanges;
+        if (hasChanges) {
+            saveAllButton.style.opacity = '1';
+        } else {
+            saveAllButton.style.opacity = '0.6';
+        }
+    }
+
+    function displaySitesStatus(message, isError) {
+        sitesStatusDiv.textContent = message;
+        sitesStatusDiv.className = isError ? 'status-error' : 'status-success';
+        setTimeout(() => {
+            sitesStatusDiv.textContent = '';
+            sitesStatusDiv.className = '';
+        }, 4000);
+    }
+
+    function saveDistractingSites() {
+        chrome.runtime.sendMessage({
+            type: 'UPDATE_DISTRACTING_SITES',
+            distractingSites: currentDistractingSites
+        }, (response) => {
+            if (chrome.runtime.lastError) {
+                console.error("Error updating distracting sites:", chrome.runtime.lastError);
+                displaySitesStatus("Error saving distracting sites.", true);
+            } else {
+                console.log("Distracting sites updated:", response);
+                sitesChanged = false;
+                updateSaveButtonState();
+                displaySitesStatus("Distracting sites saved successfully!", false);
+            }
+        });
+    }
+
+    // Event Listeners for Distracting Sites
+    addSiteButton.addEventListener('click', () => {
+        addDistractingSite(newSiteInput.value);
+    });
+
+    newSiteInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            addDistractingSite(newSiteInput.value);
+        }
+    });
+
+    resetSitesButton.addEventListener('click', resetToDefaultSites);
+
+    // Event delegation for remove buttons
+    distractingSitesList.addEventListener('click', (e) => {
+        if (e.target.classList.contains('remove-site-btn')) {
+            const index = parseInt(e.target.dataset.index);
+            removeDistractingSite(index);
+        }
+    });
 
     loadSettings();
 
