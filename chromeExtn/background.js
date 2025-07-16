@@ -2,8 +2,8 @@
 
 // Default settings - these will be overridden by storage if available
 let settings = {
-    startTime: "09:00", 
-    endTime: "17:00",   
+    startTime: "00:00", // Default start time
+    endTime: "23:59",   // Default end time
     userSetWorkDuration: 25 * 60,
     shortBreakDuration: 5 * 60,
     longBreakDuration: 15 * 60,
@@ -705,6 +705,22 @@ chrome.runtime.onStartup.addListener(() => {
         }); 
         // Don't broadcast state during initialization - popup will request it when needed
     });
+});
+
+// Listen for changes in chrome.storage and reload settings if relevant keys change
+chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName === 'local') {
+        const relevantKeys = [
+            'startTime', 'endTime', 'userSetWorkDuration', 'shortBreakDuration',
+            'longBreakDuration', 'pomodorosUntilLongBreak', 'distractingSites'
+        ];
+        if (Object.keys(changes).some(key => relevantKeys.includes(key))) {
+            console.log("Detected settings change in storage, reloading settings...");
+            loadSettingsAndInitializeState(() => {
+                broadcastState();
+            });
+        }
+    }
 });
 
 // --- Context Menu Setup ---
