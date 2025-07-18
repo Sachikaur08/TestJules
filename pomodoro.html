@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LUMINARA - Pomodoro Timer</title>
+    <link rel="stylesheet" href="css/pomodoro.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>LUMINARA</h1>
+        </header>
+        <div class="timer-container">
+            <div class="tabs">
+                <button class="tab active" data-time="25">Pomodoro</button>
+                <button class="tab" data-time="5">Short Break</button>
+                <button class="tab" data-time="15">Long Break</button>
+            </div>
+            <div class="timer-options">
+                <button class="timer-option" data-time="50">50 min</button>
+                <button class="timer-option" data-time="10">10 min</button>
+                <button class="timer-option" data-time="20">20 min</button>
+            </div>
+            <div class="timer">
+                <span id="minutes">25</span>:<span id="seconds">00</span>
+            </div>
+            <button id="start-btn">START</button>
+            <p class="status">#1 Time to focus!</p>
+        </div>
+        <div class="tasks-container">
+            <div class="tasks-header">
+                <h2>Tasks</h2>
+                <button class="menu-btn"><i class="fas fa-ellipsis-v"></i></button>
+            </div>
+            <div class="add-task-box">
+                <input type="text" id="task-input" placeholder="+ Add Task">
+            </div>
+            <ul id="task-list"></ul>
+        </div>
+    </div>
+    <script src="js/pomodoro.js"></script>
+</body>
+</html>

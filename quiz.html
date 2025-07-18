@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz - NCERT Physics</title>
+    <link href="https://fonts.googleapis.com/css?family=Lato&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Quiz</h1>
+        </div>
+    </header>
+    <div class="container">
+        <main>
+            <div class="dropdown">
+                <button class="dropbtn">Menu</button>
+                <div class="dropdown-content">
+                    <a href="home.html">Home</a>
+                    <a href="quiz.html">Quiz</a>
+                    <a href="flashcards.html">Flashcards</a>
+                    <a href="chatbot.html">Chatbot</a>
+                    <a href="rewards.html">Streak & Rewards</a>
+                    <a href="past-questions.html">Past Year Questions</a>
+                    <a href="timer.html">Pomodoro Timer</a>
+                </div>
+            </div>
+            <section id="quiz">
+                <div class="quiz-question">
+                    <p><strong>Question 1 (Easy):</strong> What is the SI unit of electric charge?</p>
+                    <div class="options">
+                        <button class="option">A) Ampere</button>
+                        <button class="option">B) Volt</button>
+                        <button class="option" data-correct="true">C) Coulomb</button>
+                        <button class="option">D) Ohm</button>
+                    </div>
+                    <div class="feedback"></div>
+                    <div class="solution" style="display: none;">The SI unit of electric charge is the Coulomb (C).</div>
+                </div>
+                <div class="quiz-question">
+                    <p><strong>Question 2 (Medium):</strong> Two charges of 10C and -15C are separated by a distance of 2m. What is the force between them?</p>
+                    <div class="options">
+                        <button class="option">A) 3.375 x 10^11 N (attractive)</button>
+                        <button class="option" data-correct="true">B) 3.375 x 10^12 N (attractive)</button>
+                        <button class="option">C) 3.375 x 10^11 N (repulsive)</button>
+                        <button class="option">D) 3.375 x 10^12 N (repulsive)</button>
+                    </div>
+                    <div class="feedback"></div>
+                    <div class="solution" style="display: none;">Using Coulomb's Law, F = k * |q1*q2| / r^2 = (8.987 x 10^9) * |10 * -15| / 2^2 = 3.375 x 10^12 N. Since the charges are opposite, the force is attractive.</div>
+                </div>
+                <div class="quiz-question">
+                    <p><strong>Question 3 (Hard):</strong> A charge Q is divided into two parts, q and Q-q. What is the ratio Q/q for the force between the two parts to be maximum?</p>
+                    <div class="options">
+                        <button class="option" data-correct="true">A) 2</button>
+                        <button class="option">B) 1</button>
+                        <button class="option">C) 4</button>
+                        <button class="option">D) 0.5</button>
+                    </div>
+                    <div class="feedback"></div>
+                    <div class="solution" style="display: none;">For the force to be maximum, the derivative of the force with respect to q must be zero. This occurs when q = Q/2, so Q/q = 2.</div>
+                </div>
+            </section>
+        </main>
+    </div>
+    <script src="js/script.js"></script>
+</body>
+</html>
