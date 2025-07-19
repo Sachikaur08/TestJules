@@ -114,7 +114,8 @@ function loadSettingsAndInitializeState(callback) {
   chrome.storage.local.get([
     'startTime', 'endTime',
     'userSetWorkDuration', 'shortBreakDuration', 'longBreakDuration',
-    'pomodorosUntilLongBreak', 'pomodorosCompletedThisCycle', 'distractingSites'
+    'pomodorosUntilLongBreak', 'pomodorosCompletedThisCycle', 'distractingSites',
+    'savedCurrentTime', 'savedSessionType', 'savedIsPaused', 'savedIsAdHocTimeoutActive'
   ], (loadedData) => {
     settings.startTime = loadedData.startTime || settings.startTime;
     settings.endTime = loadedData.endTime || settings.endTime;
@@ -123,42 +124,64 @@ function loadSettingsAndInitializeState(callback) {
     settings.longBreakDuration = loadedData.longBreakDuration !== undefined ? loadedData.longBreakDuration : settings.longBreakDuration;
     settings.pomodorosUntilLongBreak = loadedData.pomodorosUntilLongBreak !== undefined ? loadedData.pomodorosUntilLongBreak : settings.pomodorosUntilLongBreak;
 
-    timerState.currentTime = settings.userSetWorkDuration;
-    timerState.isPaused = true;
-    timerState.currentSessionType = 'WORK';
+    // Restore currentTime if session is in progress
+    if (
+      loadedData.savedCurrentTime !== undefined &&
+      loadedData.savedSessionType === 'WORK' &&
+      loadedData.savedIsPaused !== undefined &&
+      loadedData.savedIsAdHocTimeoutActive !== undefined
+    ) {
+      timerState.currentTime = loadedData.savedCurrentTime;
+      timerState.currentSessionType = loadedData.savedSessionType;
+      timerState.isPaused = loadedData.savedIsPaused;
+      timerState.isAdHocTimeoutActive = loadedData.savedIsAdHocTimeoutActive;
+    } else {
+      timerState.currentTime = settings.userSetWorkDuration;
+      timerState.isPaused = true;
+      timerState.currentSessionType = 'WORK';
+      timerState.isAdHocTimeoutActive = false;
+    }
     timerState.pomodorosCompletedThisCycle = loadedData.pomodorosCompletedThisCycle || 0; 
-    
-    timerState.isAdHocTimeoutActive = false;
     timerState.currentAdHocTimeoutTime = 0;
     timerState.adHocTimeoutStartTime = 0;
     timerState.adHocTimeoutCountThisSession = 0;
     timerState.totalAdHocTimeoutDurationThisSession = 0;
-    
     timerState.currentWorkSessionDistractions = {};
     timerState.currentlyTrackedDistractingSite = null;
-
     // Ensure snooze related fields are at their default (non-snooze) state
     timerState.pendingChoiceAfterWork = false;
     timerState.currentWorkSessionInitialStartTime = 0; 
     timerState.currentWorkSessionPlannedDuration = settings.userSetWorkDuration;
     timerState.currentWorkSessionSnoozeCount = 0;
     timerState.currentWorkSessionTotalSnoozeSeconds = 0;
-
     timerState.showSessionSummary = false;
     timerState.sessionSummaryText = "";
     timerState.currentSessionActualStartTime = 0; 
-    
     // Load distracting sites from storage
     if (loadedData.distractingSites && Array.isArray(loadedData.distractingSites)) {
         DISTRACTING_SITES.length = 0;
         DISTRACTING_SITES.push(...loadedData.distractingSites);
         console.log("Distracting sites loaded from storage:", DISTRACTING_SITES);
     }
-    
     checkIfOutsideActiveHours(); 
     if (callback) callback();
     createOrUpdateDailyScheduler(); 
   });
+}
+
+// Helper to persist currentTime and session state
+function persistCurrentTime() {
+  chrome.storage.local.set({
+    savedCurrentTime: timerState.currentTime,
+    savedSessionType: timerState.currentSessionType,
+    savedIsPaused: timerState.isPaused,
+    savedIsAdHocTimeoutActive: timerState.isAdHocTimeoutActive
+  });
+}
+
+// Helper to clear persisted currentTime
+function clearPersistedCurrentTime() {
+  chrome.storage.local.remove(['savedCurrentTime', 'savedSessionType', 'savedIsPaused', 'savedIsAdHocTimeoutActive']);
 }
 
 function checkIfOutsideActiveHours() {
@@ -302,6 +325,7 @@ function resetPomodoroCycle() {
             }
         });
         broadcastState();
+        clearPersistedCurrentTime(); // Clear saved currentTime when cycle is reset
     } catch (error) {
         console.error("Error in resetPomodoroCycle:", error);
     }
@@ -411,6 +435,7 @@ function advanceToNextSession() { // Reverted to pre-snooze logic
   }
 
   showNotification(notificationMessage);
+  clearPersistedCurrentTime(); // Clear saved currentTime when session ends
   broadcastState(); 
 }
 
@@ -432,6 +457,7 @@ function startAdHocTimeout() {
         timerState.adHocTimeoutStartTime = Date.now(); 
         timerState.currentAdHocTimeoutTime = 0; 
         timerState.showSessionSummary = false; 
+        persistCurrentTime(); // Save currentTime when timeout starts
         console.log("Ad-hoc timeout started. Main timer paused."); 
         broadcastState();
     }
@@ -460,6 +486,7 @@ function finishAdHocTimeoutAndResume() {
             startMainTimerAlarm(); 
             handleTabActivity(); 
         }
+        persistCurrentTime(); // Save currentTime when timeout ends
         broadcastState();
     }
 }
@@ -521,6 +548,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
         if (!timerState.isPaused && !timerState.isAdHocTimeoutActive) { 
             if (timerState.currentTime > 0) {
                 timerState.currentTime--;
+                persistCurrentTime(); // Save currentTime on every tick
                 broadcastState();
             } else { 
                 advanceToNextSession(); // Directly advance, no pending choice
