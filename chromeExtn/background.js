@@ -568,7 +568,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             if ((timerState.currentSessionType === 'SHORT_BREAK' || timerState.currentSessionType === 'LONG_BREAK') && timerState.showSessionSummary) {
                 // This is a snooze - treat as extension of previous work session
                 timerState.currentSessionType = 'WORK';
-                timerState.currentTime = 0.1 * 60; // 10 minutes
+                timerState.currentTime = 10 * 60; // 10 minutes
                 timerState.isPaused = false; // Automatically start the timer
                 timerState.showSessionSummary = false;
                 timerState.sessionSummaryText = '';
