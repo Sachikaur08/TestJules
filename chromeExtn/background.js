@@ -50,7 +50,8 @@ let timerState = {
   currentWorkSessionInitialStartTime: 0, // Timestamp of when the *very first* segment of an extended WORK session began
   currentWorkSessionPlannedDuration: 0,  // Planned duration of the initial WORK segment from settings
   currentWorkSessionSnoozeCount: 0,    // How many times snooze was used in the current extended WORK session
-  currentWorkSessionTotalSnoozeSeconds: 0 // Total accumulated snooze time for the current extended WORK session
+  currentWorkSessionTotalSnoozeSeconds: 0, // Total accumulated snooze time for the current extended WORK session
+  isSnoozeSession: false  // Track if current session is a snooze extension
 };
 
 // --- Helper Functions ---
@@ -233,11 +234,14 @@ function startMainTimer() {
 
         // If this is the very start of a new WORK cycle
         if (timerState.currentSessionType === 'WORK' && timerState.currentTime === settings.userSetWorkDuration) {
-            // This is also where snooze related initializations would go, but they are removed for this revert.
-            // Reset session-specific accumulators
+            // Reset all session-specific state and snooze tracking
             timerState.currentWorkSessionDistractions = {};
             timerState.adHocTimeoutCountThisSession = 0; 
             timerState.totalAdHocTimeoutDurationThisSession = 0;
+            timerState.currentWorkSessionSnoozeCount = 0;
+            timerState.currentWorkSessionTotalSnoozeSeconds = 0;
+            timerState.isSnoozeSession = false;
+            timerState.isSnoozeSession = false;
             console.log("New WORK cycle segment started. Initializing session aggregates.");
         }
         
@@ -335,31 +339,35 @@ function advanceToNextSession() { // Reverted to pre-snooze logic
   const sessionEndTime = Date.now();
   let plannedDuration;
 
-  if (timerState.currentSessionType === 'WORK') {
-    plannedDuration = settings.userSetWorkDuration;
-    stopCurrentDistractionTracking(true); // Finalize distraction tracking for this WORK session
-    addLogEntry({
-        id: `${timerState.currentSessionActualStartTime}_WORK`,
-        type: 'WORK',
-        date: getFormattedDate(timerState.currentSessionActualStartTime),
-        startTime: timerState.currentSessionActualStartTime,
-        endTime: sessionEndTime,
-        plannedDuration: plannedDuration,
-        actualDuration: Math.floor((sessionEndTime - timerState.currentSessionActualStartTime) / 1000), 
-        adHocTimeoutCount: timerState.adHocTimeoutCountThisSession,
-        totalAdHocTimeoutDuration: timerState.totalAdHocTimeoutDurationThisSession,
-        distractions: { ...timerState.currentWorkSessionDistractions } 
-    });
-    generateSessionSummary(); 
-    timerState.pomodorosCompletedThisCycle++;
-    chrome.storage.local.set({ pomodorosCompletedThisCycle: timerState.pomodorosCompletedThisCycle }, () => {
-        if (chrome.runtime.lastError) {
-            console.error("Error saving pomodoros completed count:", chrome.runtime.lastError.message);
+    if (timerState.currentSessionType === 'WORK') {
+        plannedDuration = settings.userSetWorkDuration;
+        stopCurrentDistractionTracking(true); // Finalize distraction tracking for this WORK session
+        addLogEntry({
+            id: `${timerState.currentSessionActualStartTime}_WORK`,
+            type: 'WORK',
+            date: getFormattedDate(timerState.currentSessionActualStartTime),
+            startTime: timerState.currentSessionActualStartTime,
+            endTime: sessionEndTime,
+            plannedDuration: plannedDuration,
+            actualDuration: Math.floor((sessionEndTime - timerState.currentSessionActualStartTime) / 1000), 
+            adHocTimeoutCount: timerState.adHocTimeoutCountThisSession,
+            totalAdHocTimeoutDuration: timerState.totalAdHocTimeoutDurationThisSession,
+            distractions: { ...timerState.currentWorkSessionDistractions },
+            isSnoozeSession: timerState.isSnoozeSession
+        });
+        generateSessionSummary(); 
+        // Only increment if this wasn't a snooze session
+        if (!timerState.isSnoozeSession) {
+            timerState.pomodorosCompletedThisCycle++;
+            chrome.storage.local.set({ pomodorosCompletedThisCycle: timerState.pomodorosCompletedThisCycle }, () => {
+                if (chrome.runtime.lastError) {
+                    console.error("Error saving pomodoros completed count:", chrome.runtime.lastError.message);
+                }
+            });
         }
-    });
-    notificationMessage = "Focus session complete! Time for a break."; 
-    
-    if (timerState.pomodorosCompletedThisCycle >= settings.pomodorosUntilLongBreak) { 
+        // Reset the snooze session flag
+        timerState.isSnoozeSession = false;
+        notificationMessage = "Focus session complete! Time for a break.";     if (timerState.pomodorosCompletedThisCycle >= settings.pomodorosUntilLongBreak) { 
       timerState.currentSessionType = 'LONG_BREAK';
       timerState.currentTime = settings.longBreakDuration; 
       timerState.pomodorosCompletedThisCycle = 0; 
@@ -398,7 +406,8 @@ function advanceToNextSession() { // Reverted to pre-snooze logic
     notificationMessage = "Break's over! Time to focus."; 
     timerState.currentSessionType = 'WORK';
     timerState.currentTime = settings.userSetWorkDuration; 
-    timerState.showSessionSummary = false; 
+    timerState.showSessionSummary = false;
+    timerState.isSnoozeSession = false; 
   }
 
   showNotification(notificationMessage);
@@ -557,26 +566,32 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         case 'REQUEST_SNOOZE':
             // Only allow snooze if last session was WORK and just ended (i.e., before break starts)
             if ((timerState.currentSessionType === 'SHORT_BREAK' || timerState.currentSessionType === 'LONG_BREAK') && timerState.showSessionSummary) {
-                // Go back to WORK session, add 10 minutes and automatically start
+                // This is a snooze - treat as extension of previous work session
                 timerState.currentSessionType = 'WORK';
-                timerState.currentTime = 10 * 60; // 10 minutes
+                timerState.currentTime = 0.1 * 60; // 10 minutes
                 timerState.isPaused = false; // Automatically start the timer
                 timerState.showSessionSummary = false;
                 timerState.sessionSummaryText = '';
+                timerState.isSnoozeSession = true; // Mark this as a snooze session
+                // Update snooze tracking stats
                 timerState.currentWorkSessionSnoozeCount = (timerState.currentWorkSessionSnoozeCount || 0) + 1;
                 timerState.currentWorkSessionTotalSnoozeSeconds = (timerState.currentWorkSessionTotalSnoozeSeconds || 0) + 600;
                 
-                // Initialize the snooze session
+                // For snooze, use same session start time to treat as extension
                 timerState.currentSessionActualStartTime = Date.now();
-                timerState.currentWorkSessionDistractions = {};
-                timerState.adHocTimeoutCountThisSession = 0;
-                timerState.totalAdHocTimeoutDurationThisSession = 0;
+                // Keep previous distractions and timeout counts as it's the same session
                 
                 // Start the timer alarm and distraction tracking
                 startMainTimerAlarm();
                 handleTabActivity();
                 
-                showNotification("Snooze activated! Focus session started with 10 additional minutes.");
+                // Decrement pomodoro count since we're extending previous session
+                if (timerState.pomodorosCompletedThisCycle > 0) {
+                    timerState.pomodorosCompletedThisCycle--;
+                    chrome.storage.local.set({ pomodorosCompletedThisCycle: timerState.pomodorosCompletedThisCycle });
+                }
+                
+                showNotification("Snooze activated! Focus session extended by 10 minutes.");
                 broadcastState();
             }
             sendResponse({status: "Snooze processed"});

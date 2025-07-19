@@ -306,7 +306,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (log.type === 'WORK') {
                         dailyTotalWorkSessionSeconds += (log.actualDuration || 0);
                         dailyTotalTimeoutSeconds += (log.totalAdHocTimeoutDuration || 0);
-                        dailyCycles++; 
+                        // Only count as a cycle if it wasn't a snooze session
+                        if (!log.isSnoozeSession) {
+                            dailyCycles++;
+                        }
                         if (log.distractions) {
                             Object.values(log.distractions).forEach(siteTime => {
                                 dailyTotalDistractionSiteSeconds += (siteTime || 0);
