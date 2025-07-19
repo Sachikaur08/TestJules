@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Electrostatics Lesson - NCERT Physics</title>
+    <link href="https://fonts.googleapis.com/css?family=Lato&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>LUMINARA</h1>
+            <p>Electrostatics Lesson</p>
+        </div>
+    </header>
+    <div class="container">
+        <main>
+            <div class="dropdown">
+                <button class="dropbtn">Menu</button>
+                <div class="dropdown-content">
+                    <a href="home.html">Home</a>
+                    <a href="electrostatics.html">Electrostatics</a>
+                    <a href="quiz.html">Quiz</a>
+                    <a href="flashcards.html">Flashcards</a>
+                    <a href="chatbot.html">Chatbot</a>
+                    <a href="rewards.html">Streak & Rewards</a>
+                    <a href="past-questions.html">Past Year Questions</a>
+                    <a href="timer.html">Pomodoro Timer</a>
+                </div>
+            </div>
+            <section id="chapter-explanation">
+                <h2>Chapter Explanation <button id="read-aloud-btn"><i class="fas fa-volume-up"></i></button></h2>
+                <div class="topic">
+                    <h3>1. Electric Charge</h3>
+                    <h4>1.1 Definition</h4>
+                    <p>Charge is that property that is associated with the matter due to which it produces and experiences electrical and magnetic effects.</p>
+                    <h4>1.2 Type</h4>
+                    <p>There exist two types of charges in nature. They are:</p>
+                    <ul>
+                        <li>Positive charge</li>
+                        <li>Negative charge</li>
+                    </ul>
+                    <p>Charges with the same electrical sign repel each other while charges with opposite electrical signs attract each other.</p>
+                    <h4>1.3 Unit and Dimensional Formula</h4>
+                    <p>S.I. unit of charge is coulomb (C),</p>
+                    <p>1mC = 10⁻³ C, 1 μC = 10⁻⁶ C, 1nC = 10⁻⁹ C</p>
+                    <p>C.G.S. unit of charge is e.s.u.</p>
+                    <p>1C = 3 × 10⁹ esu</p>
+                    <p>Dimensional formula is given by [Q] = [AT].</p>
+                    <h4>1.4 Point Charge</h4>
+                    <p>Whose spatial size is negligible as compared to other distances.</p>
+                    <h4>1.5 Properties of Charge</h4>
+                    <ul>
+                        <li>(i) Charge is a Scalar Quantity: Charges can be added or subtracted algebraically.</li>
+                        <li>(ii) Charge is transferable: When a charged body is put in contact with an uncharged body, the uncharged body becomes charged due to the transfer of electrons.</li>
+                        <li>(iii) Charge is always associated with mass: Charge cannot exist without mass though mass can exist without charge.</li>
+                        <li>(iv) Charge is conserved: Charge can neither be created nor destroyed.</li>
+                        <li>(v) Invariance of charge: The numerical value of an elementary charge is independent of velocity.</li>
+                        <li>(vi) Charge produces an electric and magnetic field: A rest charge produces only electric field; a moving charge produces both electric and magnetic fields; accelerated charge also radiates energy as EM waves.</li>
+                        <li>(vii) Charge resides on the surface of conductor: Like charges repel, so charges move to outer surface. Thus solid and hollow conducting spheres of the same radius hold equal maximum charge.</li>
+                        <li>(viii) Quantization of charge: Charge appears in discrete values, i.e., Q=±ne, where e=1.6×10−19 C and n=0,1,2,3…</li>
+                    </ul>
+                    <h4>1.6 Comparison of Charge and Mass</h4>
+                    <table>
+                        <tr>
+                            <th>S. No</th>
+                            <th>Charge</th>
+                            <th>Mass</th>
+                        </tr>
+                        <tr>
+                            <td>1</td>
+                            <td>Can be positive, negative or zero</td>
+                            <td>Always positive</td>
+                        </tr>
+                        <tr>
+                            <td>2</td>
+                            <td>Independent of velocity</td>
+                            <td>Increases with velocity (relativistically)</td>
+                        </tr>
+                        <tr>
+                            <td>3</td>
+                            <td>Quantized</td>
+                            <td>Quantization not yet established</td>
+                        </tr>
+                        <tr>
+                            <td>4</td>
+                            <td>Conserved</td>
+                            <td>Not conserved (mass-energy interconversion)</td>
+                        </tr>
+                        <tr>
+                            <td>5</td>
+                            <td>Can be attractive or repulsive</td>
+                            <td>Always attractive (gravitational)</td>
+                        </tr>
+                    </table>
+                    <h4>1.7 Methods of Charging</h4>
+                    <ul>
+                        <li>(i) By friction: Electrons are transferred from one body to another upon rubbing, creating opposite charges (e.g., glass + silk, ebonite + wool).</li>
+                        <li>(ii) By induction: A charged body near a neutral one induces opposite charge on the near side and similar charge on the far side. The inducing body loses no charge.</li>
+                        <li>(iii) By conduction: A charged conductor transfers charge to another when brought in contact. Both get similarly charged.</li>
+                    </ul>
+                </div>
+                <div class="topic">
+                    <h3>2. Coulomb's Law</h3>
+                    <p>If two stationary and point charges q₁ and q₂ are kept at a distance r, the force F between them is:</p>
+                    <p>F = k × (q₁ × q₂) / r²</p>
+                    <p>Where k is a constant.</p>
+                    <p>In SI units:</p>
+                    <p>k = 8.988 × 10⁹ N·m²/C² ≈ 9.0 × 10⁹ N·m²/C²</p>
+                    <p>Direction of force is along the line joining the charges.</p>
+                    <p>Force is repulsive if charges are alike, attractive if opposite.</p>
+                    <p>Force is conservative and follows the inverse square law.</p>
+                    <h4>2.1 Variation of k</h4>
+                    <p>In C.G.S. units (air):</p>
+                    <p>F = (Q₁ × Q₂) / r², and k = 1, unit is dyne.</p>
+                    <p>In S.I. units:</p>
+                    <p>k = 1 / (4 × π × ε₀) = 9 × 10⁹ N·m²/C²</p>
+                    <p>Where ε₀ (epsilon naught) is the absolute permittivity of free space:</p>
+                    <p>ε₀ = 8.85 × 10⁻¹² C²/N·m²</p>
+                    <p>Dimensions of ε₀:</p>
+                    <p>[M⁻¹ L⁻³ T⁴ A²]</p>
+                    <p>Also,</p>
+                    <p>c = 1 / √(μ₀ × ε₀)</p>
+                    <p>where μ₀ is the magnetic permeability of free space and c is the speed of light.</p>
+                    <h4>2.1.2 Effect of Medium</h4>
+                    <p>If a dielectric is present between the charges, the force becomes:</p>
+                    <p>F_medium = F_air / K</p>
+                    <p>or,</p>
+                    <p>F = (1 / (4 × π × ε₀ × K)) × (q₁ × q₂) / r²</p>
+                    <p>Where K = dielectric constant = ε_r = relative permittivity of the medium.</p>
+                    <p>Common values of K:</p>
+                    <ul>
+                        <li>Vacuum/Air = 1</li>
+                        <li>Water = 80</li>
+                        <li>Mica = 6</li>
+                        <li>Glass = 5 to 10</li>
+                        <li>Metal = ∞</li>
+                    </ul>
+                </div>
+                <div class="topic">
+                    <h3>3. Electric Field</h3>
+                    <p>Electric field is the region around a charge where another charge experiences a force.</p>
+                    <h4>3.1 Electric Field Intensity (E)</h4>
+                    <p>Defined as the force experienced by a unit positive test charge placed at a point.</p>
+                    <p>E = F / q₀</p>
+                    <p>(Here q₀ → 0 to avoid disturbing the source charge)</p>
+                    <p>Unit: N/C or V/m</p>
+                    <p>Dimension: [M L T⁻³ A⁻¹]</p>
+                    <p>Direction:</p>
+                    <ul>
+                        <li>Away from positive charge</li>
+                        <li>Toward negative charge</li>
+                    </ul>
+                    <h4>3.2 Relation Between Electric Force and Electric Field</h4>
+                    <p>If a charge Q is placed in an electric field E, it experiences a force:</p>
+                    <p>F = Q × E</p>
+                    <p>If Q > 0, force is in the direction of the field.</p>
+                    <p>If Q < 0, force is opposite to the field.</p>
+                    <h4>3.3 Superposition of Electric Field</h4>
+                    <p>The resultant electric field at any point is the vector sum of the electric fields due to individual charges:</p>
+                    <p>E_net = E₁ + E₂ + E₃ + ...</p>
+                    <p>If E₁ and E₂ are at an angle θ:</p>
+                    <p>Magnitude:</p>
+                    <p>E = √(E₁² + E₂² + 2 × E₁ × E₂ × cosθ)</p>
+                    <p>Direction:</p>
+                    <p>tanα = (E₂ × sinθ) / (E₁ + E₂ × cosθ)</p>
+                    <h4>3.4 Electric Field Due to a Point Charge</h4>
+                    <p>A point charge Q produces an electric field at a distance r:</p>
+                    <p>E = (1 / (4 × π × ε₀)) × (Q / r²)</p>
+                    <p>For positive Q, field is radially outward.</p>
+                    <p>For negative Q, field is inward.</p>
+                    <h4>3.5 Continuous Charge Distributions</h4>
+                    <p>Three types of charge densities:</p>
+                    <ul>
+                        <li>Linear charge density: λ = q / L (unit: C/m)</li>
+                        <li>Surface charge density: σ = q / A (unit: C/m²)</li>
+                        <li>Volume charge density: ρ = q / V (unit: C/m³)</li>
+                    </ul>
+                    <h4>3.6 Properties of Electric Field Lines</h4>
+                    <ul>
+                        <li>Field lines start from positive and end on negative charges.</li>
+                        <li>Number of lines ∝ magnitude of charge.</li>
+                        <li>Number of lines per unit area ∝ field strength.</li>
+                        <li>Tangent to a field line gives the direction of E at that point.</li>
+                        <li>Field lines never intersect.</li>
+                        <li>Uniform fields have straight, parallel, evenly spaced lines.</li>
+                        <li>Field lines don’t form closed loops.</li>
+                        <li>They emerge and terminate perpendicular to a conductor's surface.</li>
+                        <li>Field lines go from higher to lower potential.</li>
+                        <li>No field lines in regions with zero electric field.</li>
+                    </ul>
+                    <h4>3.7 Motion of Charged Particle in an Electric Field</h4>
+                    <p>(a) Particle Initially at Rest in Uniform Field</p>
+                    <p>Let charge = Q, mass = m, field = E.</p>
+                    <p>Force: F = Q × E</p>
+                    <p>Acceleration: a = F / m = Q × E / m</p>
+                    <p>Velocity after time t: v = a × t = (Q × E × t) / m</p>
+                    <p>Displacement after time t:</p>
+                    <p>Use v² = 2as → v² = (2 × Q × E × s) / m</p>
+                    <p>Momentum: p = m × v = Q × E × t</p>
+                    <p>Kinetic energy:</p>
+                    <p>KE = ½ m v² = (Q² × E² × t²) / (2m)</p>
+                    <p>(b) Particle Enters Field Perpendicularly (Parabolic Path)</p>
+                    <p>Let initial velocity along x-axis = u</p>
+                    <p>x-displacement: x = u × t</p>
+                    <p>y-acceleration: a = Q × E / m</p>
+                    <p>y-displacement:</p>
+                    <p>y = ½ a × t² = (1/2) × (Q × E / m) × t²</p>
+                    <p>So,</p>
+                    <p>y = (Q × E × x²) / (2 × m × u²)</p>
+                    <p>This is the equation of a parabola.</p>
+                    <p>Velocity components:</p>
+                    <p>vₓ = u (constant)</p>
+                    <p>v_y = a × t = (Q × E × t) / m</p>
+                    <p>Resultant velocity:</p>
+                    <p>v = √(vₓ² + v_y²)</p>
+                    <p>Angle with x-axis:</p>
+                    <p>tanβ = v_y / vₓ = (Q × E × t) / (m × u)</p>
+                </div>
+                <div class="topic">
+                    <h3>4. Electric Dipole</h3>
+                    <h4>4.1 General Information</h4>
+                    <p>A dipole is a system of two equal and opposite charges separated by a small, fixed distance.</p>
+                    <ul>
+                        <li>Dipole axis: Line joining negative to positive charge.</li>
+                        <li>Equatorial axis: Perpendicular bisector of the dipole.</li>
+                        <li>Dipole length (d): Distance between the two charges.</li>
+                        <li>Dipole moment (p): p = q × d (vector from –q to +q)</li>
+                        <li>SI unit: coulomb-metre (C·m) or Debye (1 Debye = 3.3 × 10⁻³⁰ C·m)</li>
+                        <li>Dimension: [M⁰ L¹ T⁰ A¹]</li>
+                    </ul>
+                    <p>Note:</p>
+                    <ul>
+                        <li>Region around a stationary dipole has only electric field.</li>
+                        <li>In dielectrics, atoms/molecules behave like tiny dipoles.</li>
+                    </ul>
+                    <h4>(a) Electric Potential Due to a Dipole</h4>
+                    <p>At point P at distance r, angle θ from axis:</p>
+                    <p>V = (1 / (4 × π × ε₀)) × (p × cosθ) / r²</p>
+                    <p>Where:</p>
+                    <ul>
+                        <li>p = dipole moment</li>
+                        <li>θ = angle between dipole axis and position vector</li>
+                    </ul>
+                    <p>Valid for r >> d</p>
+                    <h4>(b) Electric Field Due to Dipole</h4>
+                    <p>(i) On the Axial Line:</p>
+                    <p>E = (1 / (4 × π × ε₀)) × (2 × p) / r³</p>
+                    <p>Direction: Along the dipole axis.</p>
+                    <p>(ii) On the Equatorial Line:</p>
+                    <p>E = (1 / (4 × π × ε₀)) × (p) / r³</p>
+                    <p>Direction: Opposite to the dipole moment vector p.</p>
+                    <p>Summary for r >> d:</p>
+                    <ul>
+                        <li>On axial line: E = (1 / (4 × π × ε₀)) × (2p) / r³</li>
+                        <li>On equatorial line: E = (1 / (4 × π × ε₀)) × (p) / r³</li>
+                    </ul>
+                    <p>Both decrease as 1 / r³</p>
+                    <h4>4.3 Electric Dipole in Uniform Electric Field</h4>
+                    <p>Let dipole p make angle θ with uniform electric field E</p>
+                    <p>(i) Net Force: F_net = 0</p>
+                    <p>(ii) Torque: τ = p × E = p × E × sinθ</p>
+                    <p>This torque tends to align the dipole with the field.</p>
+                    <p>(iii) Work Done: To rotate the dipole from angle θ₁ to θ₂: W = p × E × (cosθ₁ – cosθ₂)</p>
+                    <p>(iv) Potential Energy (U): U = –p × E × cosθ</p>
+                    <p>Minimum potential energy when θ = 0° (aligned with field) ⇒ U = –pE</p>
+                    <p>Maximum when θ = 180° (opposite) ⇒ U = +pE</p>
+                </div>
+            </section>
+        </main>
+    </div>
+    <script src="js/script.js"></script>
+</body>
+</html>
