@@ -263,7 +263,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
         try {
             const result = await chrome.storage.local.get('neuroFocusSessionLogs');
-            const logs = result.neuroFocusSessionLogs || [];
+            let logs = result.neuroFocusSessionLogs || [];
+
+            // Filter out logs older than 90 days from today
+            const now = new Date();
+            const ninetyDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 90);
+            logs = logs.filter(log => {
+                // log.date is expected to be in 'YYYY-MM-DD' format
+                if (!log.date) return false;
+                const logDate = new Date(log.date + 'T00:00:00');
+                return logDate >= ninetyDaysAgo;
+            });
 
             if (focusTimeoutsChartInstance) { focusTimeoutsChartInstance.destroy(); focusTimeoutsChartInstance = null; }
             if (cyclesChartInstance) { cyclesChartInstance.destroy(); cyclesChartInstance = null; }
