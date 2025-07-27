@@ -358,6 +358,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // Automatically generate report on page load
+    generateReportData();
+
+    // Update report when the number of days changes
+    if (reportDaysInput) {
+        reportDaysInput.addEventListener('change', generateReportData);
+    }
+
     function renderFocusTimeoutsChart(data) {
         if (!focusTimeoutsChartCtx) return;
         // Destruction of old instance is now handled at the start of generateReportData
