@@ -115,7 +115,7 @@ function loadSettingsAndInitializeState(callback) {
     'startTime', 'endTime',
     'userSetWorkDuration', 'shortBreakDuration', 'longBreakDuration',
     'pomodorosUntilLongBreak', 'pomodorosCompletedThisCycle', 'distractingSites',
-    'savedCurrentTime', 'savedSessionType', 'savedIsPaused', 'savedIsAdHocTimeoutActive'
+    'savedCurrentTime', 'savedSessionType', 'savedIsPaused', 'savedIsAdHocTimeoutActive', 'savedLastUpdated'
   ], (loadedData) => {
     settings.startTime = loadedData.startTime || settings.startTime;
     settings.endTime = loadedData.endTime || settings.endTime;
@@ -124,14 +124,20 @@ function loadSettingsAndInitializeState(callback) {
     settings.longBreakDuration = loadedData.longBreakDuration !== undefined ? loadedData.longBreakDuration : settings.longBreakDuration;
     settings.pomodorosUntilLongBreak = loadedData.pomodorosUntilLongBreak !== undefined ? loadedData.pomodorosUntilLongBreak : settings.pomodorosUntilLongBreak;
 
-    // Restore currentTime if session is in progress
+    // Restore currentTime if session is in progress, adjusting for real elapsed time
     if (
       loadedData.savedCurrentTime !== undefined &&
       loadedData.savedSessionType === 'WORK' &&
       loadedData.savedIsPaused !== undefined &&
       loadedData.savedIsAdHocTimeoutActive !== undefined
     ) {
-      timerState.currentTime = loadedData.savedCurrentTime;
+      let adjustedCurrentTime = loadedData.savedCurrentTime;
+      if (!loadedData.savedIsPaused && !loadedData.savedIsAdHocTimeoutActive && loadedData.savedLastUpdated) {
+        // Timer was running, so subtract elapsed time
+        const elapsed = Math.floor((Date.now() - loadedData.savedLastUpdated) / 1000); // in seconds
+        adjustedCurrentTime = Math.max(0, adjustedCurrentTime - elapsed);
+      }
+      timerState.currentTime = adjustedCurrentTime;
       timerState.currentSessionType = loadedData.savedSessionType;
       timerState.isPaused = loadedData.savedIsPaused;
       timerState.isAdHocTimeoutActive = loadedData.savedIsAdHocTimeoutActive;
@@ -175,13 +181,14 @@ function persistCurrentTime() {
     savedCurrentTime: timerState.currentTime,
     savedSessionType: timerState.currentSessionType,
     savedIsPaused: timerState.isPaused,
-    savedIsAdHocTimeoutActive: timerState.isAdHocTimeoutActive
+    savedIsAdHocTimeoutActive: timerState.isAdHocTimeoutActive,
+    savedLastUpdated: Date.now() // Save the last updated timestamp
   });
 }
 
 // Helper to clear persisted currentTime
 function clearPersistedCurrentTime() {
-  chrome.storage.local.remove(['savedCurrentTime', 'savedSessionType', 'savedIsPaused', 'savedIsAdHocTimeoutActive']);
+  chrome.storage.local.remove(['savedCurrentTime', 'savedSessionType', 'savedIsPaused', 'savedIsAdHocTimeoutActive', 'savedLastUpdated']);
 }
 
 function checkIfOutsideActiveHours() {
@@ -548,7 +555,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
         if (!timerState.isPaused && !timerState.isAdHocTimeoutActive) { 
             if (timerState.currentTime > 0) {
                 timerState.currentTime--;
-                persistCurrentTime(); // Save currentTime on every tick
+                persistCurrentTime(); // Save currentTime and lastUpdated on every tick
                 broadcastState();
             } else { 
                 advanceToNextSession(); // Directly advance, no pending choice
